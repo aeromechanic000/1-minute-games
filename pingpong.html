@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>P5.js Ping Pong Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+<script>
+let ball = {
+    x: 400,
+    y: 300,
+    size: 15,
+    speedX: 5,
+    speedY: 5
+};
+
+let playerPaddle = {
+    x: 50,
+    y: 300,
+    width: 10,
+    height: 100,
+    speed: 8,
+    score: 0
+};
+
+let computerPaddle = {
+    x: 750,
+    y: 300,
+    width: 10,
+    height: 100,
+    speed: 5,
+    score: 0
+};
+
+let gameStarted = false;
+let startButton, resetButton;
+
+function setup() {
+    createCanvas(800, 600);
+    
+    // Create buttons
+    startButton = createButton('Start');
+    startButton.position(350, 620);
+    startButton.mousePressed(startGame);
+    
+    resetButton = createButton('Reset');
+    resetButton.position(420, 620);
+    resetButton.mousePressed(resetGame);
+    
+    resetGame();
+}
+
+function draw() {
+    background(255);
+    drawCourt();
+    drawScores();
+    drawPaddles();
+    drawBall();
+    
+    if (gameStarted) {
+        moveBall();
+        movePlayerPaddle();
+        moveComputerPaddle();
+        checkCollisions();
+    }
+}
+
+function drawCourt() {
+    // Border
+    stroke(0);
+    strokeWeight(2);
+    noFill();
+    rect(0, 0, width, height);
+    
+    // Center line
+    for(let i = 0; i < height; i += 20) {
+        line(width/2, i, width/2, i + 10);
+    }
+}
+
+function drawScores() {
+    textSize(32);
+    fill(0);
+    noStroke();
+    text(playerPaddle.score, width/4, 50);
+    text(computerPaddle.score, 3*width/4, 50);
+}
+
+function drawPaddles() {
+    fill(0);
+    stroke(255);
+    rect(playerPaddle.x, playerPaddle.y, playerPaddle 
+.width, playerPaddle.height);
+    rect(computerPaddle.x, computerPaddle.y, 
+computerPaddle.width, computerPaddle.height);
+}
+
+function drawBall() {
+    stroke(0);
+    fill(255);
+    ellipse(ball.x, ball.y, ball.size);
+}
+
+function moveBall() {
+    ball.x += ball.speedX;
+    ball.y += ball.speedY;
+}
+
+function movePlayerPaddle() {
+    if (keyIsDown(UP_ARROW)) {
+        playerPaddle.y = max(0, playerPaddle.y - 
+playerPaddle.speed);
+    }
+    if (keyIsDown(DOWN_ARROW)) {
+        playerPaddle.y = min(height - playerPaddle.height, 
+playerPaddle.y + playerPaddle.speed);
+    }
+}
+
+function moveComputerPaddle() {
+    let targetY = ball.y - computerPaddle.height/2;
+    if (computerPaddle.y < targetY) {
+        computerPaddle.y += computerPaddle.speed;
+    }
+    if (computerPaddle.y > targetY) {
+        computerPaddle.y -= computerPaddle.speed;
+    }
+    
+    computerPaddle.y = constrain(computerPaddle.y, 0, 
+height - computerPaddle.height);
+}
+
+function checkCollisions() {
+    // Ball collision with top and bottom walls
+    if (ball.y < 0 || ball.y > height) {
+        ball.speedY *= -1;
+    }
+    
+    // Ball collision with paddles
+    if (ball.x < playerPaddle.x + playerPaddle.width && 
+        ball.y > playerPaddle.y && 
+        ball.y < playerPaddle.y + playerPaddle.height) {
+        ball.speedX *= -1;
+        ball.x = playerPaddle.x + playerPaddle.width;
+    }
+    
+    if (ball.x > computerPaddle.x && 
+        ball.y > computerPaddle.y && 
+        ball.y < computerPaddle.y + computerPaddle.height) {
+        ball.speedX *= -1;
+        ball.x = computerPaddle.x;
+    }
+    
+    // Scoring
+    if (ball.x < 0) {
+        computerPaddle.score++;
+        resetBall();
+    }
+    if (ball.x > width) {
+        playerPaddle.score++;
+        resetBall();
+    }
+}
+
+function resetBall() {
+    ball.x = width/2;
+    ball.y = height/2;
+    ball.speedX = random([-5, 5]);
+    ball.speedY = random(-5, 5);
+}
+
+function startGame() {
+    gameStarted = true;
+}
+
+function resetGame() {
+    gameStarted = false;
+    playerPaddle.score = 0;
+    computerPaddle.score = 0;
+    playerPaddle.y = height/2 - playerPaddle.height/2;
+    computerPaddle.y = height/2 - computerPaddle.height/2;
+    resetBall();
+}
+</script>
+
+<h2>Prompt</h2>
+
+Please use the P5.js framework to write a piece of code to create a black and white 2D style ping-pong game. The game should be set within a rectangular playing area.
+<br>
+1. Game Elements:
+<br>
+• Represent the ping-pong ball as a small white circle with a black outline. The ball should move across the screen with a certain speed and direction, which can change when it hits the walls or the paddles.
+<br>
+• Create two ping-pong paddles. One paddle is controlled by the user on one side of the playing area, and it can be represented as a long, thin rectangle with a black fill and white outline. The user should be able to move this paddle vertically using keyboard controls (e.g., up and down arrow keys).
+<br>
+• The other paddle on the opposite side is controlled by the computer (PC). It should also be a long, thin rectangle with a black fill and white outline, and its movement should be smooth and continuous as it automatically tries to hit the ball back. The computer paddle's movement algorithm should be designed to predict the ball's trajectory and position itself appropriately.
+<br>
+2. Playing Area:
+<br>
+
+• The playing area is a large rectangle with a white background and a black border. Divide the playing area into two halves with a black dashed line in the middle to represent the net.
+
+
+<br>
+3. Scoring System:
+
+<br>
+• Implement a simple scoring system. When the ball goes out of bounds on the opponent's side (either the computer's or the user's side), the other player scores a point. Display the scores of both the user and the computer at the top of the playing area in black text.
+
+<br>
+4. Buttons:
+
+<br>
+• Create two buttons: a "Start" button and a "Reset" button. The "Start" button should be a rectangular shape with black text on a white background, and clicking it should start the game. The "Reset" button should also be a rectangular shape with black text on a white background, and clicking it should reset the game, including the scores, the ball's position, and the paddles' positions.
+
+<br>
+5. Interaction and Movement:
+
+<br>
+• The ball's movement should be updated in each frame of the game loop. When the ball hits a paddle, its direction should change in a realistic way. When the ball hits the top or bottom walls of the playing area, it should bounce off with the appropriate change in direction.
+
+<br>
+• The user-controlled paddle should respond immediately to the keyboard input, moving smoothly within the boundaries of the playing area.
+
+<br>
+• The computer-controlled paddle should adjust its position in a continuous and fluid manner to keep up with the ball's movement.
+
+<br>
+Integrate the JavaScript code for this ping-pong game with the necessary HTML structure code and CSS style code into a single HTML file. Ensure that the code can be directly run in a browser to display and play the black and white 2D ping-pong game.
+
+</body>
+</html>
