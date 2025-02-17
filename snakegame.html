@@ -172,64 +172,6 @@ function resetGame() {
 }
 </script>
 
-<h2>Prompt</h2>
 
-Please use the P5.js framework to write a piece of code to create a classic 2D black - and - white style 贪吃蛇游戏 (Snake Game). The game should be set within a rectangular playing area.
-
-<ol>
-    <li> Game Elements:
-        <ul> 
-            <li> 
-                Snake: Represent the snake as a series of connected small white squares with a black outline. 
-                Each square represents a segment of the snake's body. The snake should start with a certain number of segments (e.g., 3) 
-                and move across the screen in one of four directions: up, down, left, or right. 
-                The direction of the snake can be changed by the user using the keyboard controls 
-                (e.g., up, down, left, and right arrow keys). 
-            </li>
-            <li>
-                Food: Create a single small white square with a black outline to represent the food. 
-                The food should be randomly placed within the playing area, but not on top of the snake's body. 
-                When the snake's head collides with the food, the snake should grow by one segment, 
-                and a new piece of food should be randomly placed within the playing area. 
-            </li>
-        </ul>
-    </li>
-    <li> 
-        Playing Area: The playing area is a large rectangle with a white background and a black border. 
-        The boundaries of the playing area define the limits within which the snake and the food can move.
-    </li>
-    <li> 
-        Scoring System: Implement a simple scoring system. Every time the snake eats the food, 
-        the player's score increases by 1. Display the score at the top of the playing area in black text.
-
-    </li>
-    <li>
-        Buttons: Create two buttons: a "Start" button and a "Reset" button. The "Start" button should be a rectangular 
-        shape with black text on a white background, and clicking it should start the game. 
-        The "Reset" button should also be a rectangular shape with black text on a white background, 
-        and clicking it should reset the game, including the score, the snake's position and length, and the position of the food.
-    </li>
-    <li>
-        Interaction and Movement: 
-        <ul>
-            <li>
-                The snake's movement should be updated in each frame of the game loop. 
-                The snake should move continuously in its current direction until the user changes its direction using the keyboard.
-            </li>
-            <li>
-                When the snake's head collides with the boundaries of the playing area or its own body, 
-                the game should end. Display a "Game Over" message in black text at the center of the playing area.
-            </li>
-            <li>
-                 The food's position should remain fixed until the snake eats it, 
-                 at which point a new random position should be generated for the food.
-            </li>
-        </ul>
-    </li>
-<ol>
-Integrate the JavaScript code for this ping-pong game with the necessary HTML structure code and CSS style code into a single HTML file. Ensure that the code can be directly run in a browser to display and play the black and white 2D ping-pong game.
-<br>
-<br>
-<br>
 </body>
 </html>
