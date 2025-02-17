@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snake Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+<script>
+    
+let snake;
+let food;
+let gridSize = 20;
+let width = 400;
+let height = 400;
+let score = 0;
+let gameStarted = false;
+let gameOver = false;
+let startButton;
+let resetButton;
+
+class Snake {
+    constructor() {
+        this.body = [{x: 200, y: 200}];
+        this.xSpeed = gridSize;
+        this.ySpeed = 0;
+        this.length = 3;
+    }
+
+    update() {
+        let head = {x: this.body[0].x + this.xSpeed, y: this.body[0].y + this.ySpeed};
+        this.body.unshift(head);
+        if (this.body.length > this.length) {
+            this.body.pop();
+        }
+    }
+
+    show() {
+        fill(255);
+        stroke(0);
+        for (let part of this.body) {
+            rect(part.x, part.y, gridSize, gridSize);
+        }
+    }
+
+    changeDirection(x, y) {
+        if (x !== -this.xSpeed || y !== -this.ySpeed) {
+            this.xSpeed = x;
+            this.ySpeed = y;
+        }
+    }
+
+    eat(food) {
+        let head = this.body[0];
+        return head.x === food.x && head.y === food.y;
+    }
+
+    checkCollision() {
+        let head = this.body[0];
+        if (head.x < 0 || head.x >= width || head.y < 0 || head.y >= height) {
+            return true;
+        }
+        for (let i = 1; i < this.body.length; i++) {
+            if (head.x === this.body[i].x && head.y === this.body[i].y) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+function setup() {
+    createCanvas(width, height);
+    frameRate(10);
+    resetGame();
+    
+    startButton = createButton('Start');
+    startButton.position(width/2 - 60, height + 10);
+    startButton.mousePressed(startGame);
+    
+    resetButton = createButton('Reset');
+    resetButton.position(width/2 + 10, height + 10);
+    resetButton.mousePressed(resetGame);
+}
+
+function draw() {
+    background(255);
+    
+    if (gameStarted && !gameOver) {
+        snake.update();
+        if (snake.eat(food)) {
+            snake.length++;
+            score++;
+            placeFood();
+        }
+        
+        if (snake.checkCollision()) {
+            gameOver = true;
+        }
+    }
+    
+    snake.show();
+    
+    // Draw food
+    fill(255);
+    stroke(0);
+    rect(food.x, food.y, gridSize, gridSize);
+    
+    // Draw score
+    fill(0);
+    noStroke();
+    textSize(20);
+    textAlign(LEFT);
+    text('Score: ' + score, 10, 30);
+    
+    if (gameOver) {
+        fill(0);
+        textSize(32);
+        textAlign(CENTER);
+        text('Game Over', width/2, height/2);
+    }
+}
+
+function keyPressed() {
+    if (!gameStarted || gameOver) return;
+    
+    if (keyCode === LEFT_ARROW) {
+        snake.changeDirection(-gridSize, 0);
+    } else if (keyCode === RIGHT_ARROW) {
+        snake.changeDirection(gridSize, 0);
+    } else if (keyCode === UP_ARROW) {
+        snake.changeDirection(0, -gridSize);
+    } else if (keyCode === DOWN_ARROW) {
+        snake.changeDirection(0, gridSize);
+    }
+}
+
+function placeFood() {
+    let cols = floor(width/gridSize);
+    let rows = floor(height/gridSize);
+    food = {
+        x: floor(random(cols)) * gridSize,
+        y: floor(random(rows)) * gridSize
+    };
+    
+    // Make sure food doesn't appear on snake
+    for (let part of snake.body) {
+        if (food.x === part.x && food.y === part.y) {
+            placeFood();
+            break;
+        }
+    }
+}
+
+function startGame() {
+    if (!gameStarted && !gameOver) {
+        gameStarted = true;
+    }
+}
+
+function resetGame() {
+    snake = new Snake();
+    score = 0;
+    gameStarted = false;
+    gameOver = false;
+    placeFood();
+}
+</script>
+
+<h2>Prompt</h2>
+
+Please use the P5.js framework to write a piece of code to create a classic 2D black - and - white style 贪吃蛇游戏 (Snake Game). The game should be set within a rectangular playing area.
+
+<ol>
+    <li> Game Elements:
+        <ul> 
+            <li> 
+                Snake: Represent the snake as a series of connected small white squares with a black outline. 
+                Each square represents a segment of the snake's body. The snake should start with a certain number of segments (e.g., 3) 
+                and move across the screen in one of four directions: up, down, left, or right. 
+                The direction of the snake can be changed by the user using the keyboard controls 
+                (e.g., up, down, left, and right arrow keys). 
+            </li>
+            <li>
+                Food: Create a single small white square with a black outline to represent the food. 
+                The food should be randomly placed within the playing area, but not on top of the snake's body. 
+                When the snake's head collides with the food, the snake should grow by one segment, 
+                and a new piece of food should be randomly placed within the playing area. 
+            </li>
+        </ul>
+    </li>
+    <li> 
+        Playing Area: The playing area is a large rectangle with a white background and a black border. 
+        The boundaries of the playing area define the limits within which the snake and the food can move.
+    </li>
+    <li> 
+        Scoring System: Implement a simple scoring system. Every time the snake eats the food, 
+        the player's score increases by 1. Display the score at the top of the playing area in black text.
+
+    </li>
+    <li>
+        Buttons: Create two buttons: a "Start" button and a "Reset" button. The "Start" button should be a rectangular 
+        shape with black text on a white background, and clicking it should start the game. 
+        The "Reset" button should also be a rectangular shape with black text on a white background, 
+        and clicking it should reset the game, including the score, the snake's position and length, and the position of the food.
+    </li>
+    <li>
+        Interaction and Movement: 
+        <ul>
+            <li>
+                The snake's movement should be updated in each frame of the game loop. 
+                The snake should move continuously in its current direction until the user changes its direction using the keyboard.
+            </li>
+            <li>
+                When the snake's head collides with the boundaries of the playing area or its own body, 
+                the game should end. Display a "Game Over" message in black text at the center of the playing area.
+            </li>
+            <li>
+                 The food's position should remain fixed until the snake eats it, 
+                 at which point a new random position should be generated for the food.
+            </li>
+        </ul>
+    </li>
+<ol>
+Integrate the JavaScript code for this ping-pong game with the necessary HTML structure code and CSS style code into a single HTML file. Ensure that the code can be directly run in a browser to display and play the black and white 2D ping-pong game.
+<br>
+<br>
+<br>
+</body>
+</html>

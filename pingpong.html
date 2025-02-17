@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>P5.js Ping Pong Game</title>
+    <title>Ping Pong Game</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
         canvas {
@@ -42,15 +42,18 @@ let gameStarted = false;
 let startButton, resetButton;
 
 function setup() {
-    createCanvas(800, 600);
-    
+    createCanvas(800, 650); 
     // Create buttons
     startButton = createButton('Start');
-    startButton.position(350, 620);
+    startButton.position(width/2 - 80, height - 40);
+    startButton.size(70, 30);
+    startButton.style('font-size', '16px');
     startButton.mousePressed(startGame);
     
     resetButton = createButton('Reset');
-    resetButton.position(420, 620);
+    resetButton.position(width/2 + 10, height - 40);
+    resetButton.size(70, 30);
+    resetButton.style('font-size', '16px');
     resetButton.mousePressed(resetGame);
     
     resetGame();
@@ -76,10 +79,10 @@ function drawCourt() {
     stroke(0);
     strokeWeight(2);
     noFill();
-    rect(0, 0, width, height);
+    rect(0, 0, width, height - 50); // Adjusted height for buttons
     
     // Center line
-    for(let i = 0; i < height; i += 20) {
+    for(let i = 0; i < height - 50; i += 20) {
         line(width/2, i, width/2, i + 10);
     }
 }
@@ -95,10 +98,8 @@ function drawScores() {
 function drawPaddles() {
     fill(0);
     stroke(255);
-    rect(playerPaddle.x, playerPaddle.y, playerPaddle 
-.width, playerPaddle.height);
-    rect(computerPaddle.x, computerPaddle.y, 
-computerPaddle.width, computerPaddle.height);
+    rect(playerPaddle.x, playerPaddle.y, playerPaddle.width, playerPaddle.height);
+    rect(computerPaddle.x, computerPaddle.y, computerPaddle.width, computerPaddle.height);
 }
 
 function drawBall() {
@@ -114,12 +115,10 @@ function moveBall() {
 
 function movePlayerPaddle() {
     if (keyIsDown(UP_ARROW)) {
-        playerPaddle.y = max(0, playerPaddle.y - 
-playerPaddle.speed);
+        playerPaddle.y = max(0, playerPaddle.y - playerPaddle.speed);
     }
     if (keyIsDown(DOWN_ARROW)) {
-        playerPaddle.y = min(height - playerPaddle.height, 
-playerPaddle.y + playerPaddle.speed);
+        playerPaddle.y = min(height - 50 - playerPaddle.height, playerPaddle.y + playerPaddle.speed);
     }
 }
 
@@ -132,13 +131,12 @@ function moveComputerPaddle() {
         computerPaddle.y -= computerPaddle.speed;
     }
     
-    computerPaddle.y = constrain(computerPaddle.y, 0, 
-height - computerPaddle.height);
+    computerPaddle.y = constrain(computerPaddle.y, 0, height - 50 - computerPaddle.height);
 }
 
 function checkCollisions() {
     // Ball collision with top and bottom walls
-    if (ball.y < 0 || ball.y > height) {
+    if (ball.y < 0 || ball.y > height - 50) {
         ball.speedY *= -1;
     }
     
@@ -170,7 +168,7 @@ function checkCollisions() {
 
 function resetBall() {
     ball.x = width/2;
-    ball.y = height/2;
+    ball.y = (height - 50)/2;
     ball.speedX = random([-5, 5]);
     ball.speedY = random(-5, 5);
 }
@@ -183,8 +181,8 @@ function resetGame() {
     gameStarted = false;
     playerPaddle.score = 0;
     computerPaddle.score = 0;
-    playerPaddle.y = height/2 - playerPaddle.height/2;
-    computerPaddle.y = height/2 - computerPaddle.height/2;
+    playerPaddle.y = (height - 50)/2 - playerPaddle.height/2;
+    computerPaddle.y = (height - 50)/2 - computerPaddle.height/2;
     resetBall();
 }
 </script>
