@@ -1,157 +1,33 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Aeromechanic's Homepage</title>
+    <title>1 Minute Games</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 </head>
 <body>
 
-<h1>Aeromechanic's Homepage</h1>
+<div width=90% align=center>
 
-<h2>About Aeromechanic</h2>
+<h1>1 Minute Games</h1>
 
-🚀 AI enthusiast | 🔥 Exploring the future of AI in interactive experiences ｜ 🎮 Building AI tools for gaming 
-
-<ul>
-    <li> 🐦 X: <a href="https://x.com/aeromechan71402" target="_blank">https://x.com/aeromechan71402</a></li>
-    <li> 💻 Github: <a href="https://github.com/aeromechanic000/" target="_blank">https://github.com/aeromechanic000/</a></li>
-    <li> 📺 Youtube: <a href="https://www.youtube.com/channel/UCGdit7JXNSmdgc7Iuz4e6xw" target="_blank">https://www.youtube.com/channel/UCGdit7JXNSmdgc7Iuz4e6xw</a></li>
-    <li> 🎮 Discord: <a href="https://discord.gg/PJv8TrBYVJ" target="_blank">https://discord.gg/PJv8TrBYVJ</a></li>
-</ul>
-
-<h2>AI Generated Games</h2>
+<p> <i class="fa fa-github" style="font-size:24px"></i> <a href="https://github.com/aeromechanic000/aeromechanic000.github.io" target="_blank">aeromechanic000.github.io</a></p>
 
 <h3>1-Player Game</h3>
-<ol>
-    <li>
-        <a href="pingpong.html" target="_blank">Ping Pong</a>: <b>Prompt</b> - Please use the P5.js framework to write a piece of code to create a black and white 2D style ping-pong game. The game should be set within a rectangular playing area.
-        <ol>
-            <li> Game Elements:
-                <ul> 
-                    <li> 
-                        Represent the ping-pong ball as a small white circle with a black outline.
-                        The ball should move across the screen with a certain speed and direction,
-                        which can change when it hits the walls or the paddles. 
-                    </li>
-                    <li>
-                        Create two ping-pong paddles. One paddle is controlled by the user 
-                        on one side of the playing area, and it can be represented as a long, 
-                        thin rectangle with a black fill and white outline. 
-                        The user should be able to move this paddle vertically using keyboard 
-                        controls (e.g., up and down arrow keys). 
-                    </li>
-                    <li> 
-                        The other paddle on the opposite side is controlled by the computer (PC). 
-                        It should also be a long, thin rectangle with a black fill and white outline,
-                        and its movement should be smooth and continuous as it automatically tries 
-                        to hit the ball back. The computer paddle's movement algorithm should be
-                        designed to predict the ball's trajectory and position itself appropriately. 
-                    </li>
-                </ul>
-            </li>
-            <li> 
-                Playing Area: The playing area is a large rectangle with a white background 
-                and a black border. Divide the playing area into two halves with a black dashed 
-                line in the middle to represent the net.
-            </li>
-            <li> 
-                Scoring System: Implement a simple scoring system. When the ball goes out of bounds 
-                on the opponent's side (either the computer's or the user's side), the other player
-                scores a point. Display the scores of both the user and the computer at the top of 
-                the playing area in black text.
-            </li>
-            <li>
-                Buttons: Create two buttons: a "Start" button and a "Reset" button. 
-                The "Start" button should be a rectangular shape with black text on a white
-                background, and clicking it should start the game. 
-                The "Reset" button should also be a rectangular shape with black text 
-                on a white background, and clicking it should reset the game, 
-                including the scores, the ball's position, and the paddles' positions.
-            </li>
-            <li>
-                Interaction and Movement: 
-                <ul>
-                    <li>
-                        The ball's movement should be updated in each frame 
-                        of the game loop. When the ball hits a paddle, its direction should change 
-                        in a realistic way. When the ball hits the top or bottom walls of 
-                        the playing area, it should bounce off with the appropriate change 
-                        in direction.
-                    </li>
-                    <li>
-                        The user-controlled paddle should respond immediately to the keyboard input,
-                        moving smoothly within the boundaries of the playing area.
-                    </li>
-                    <li>
-                        The computer-controlled paddle should adjust its position in a continuous 
-                        and fluid manner to keep up with the ball's movement.
-                    </li>
-                </ul>
-            </li>
-        </ol>
-        Integrate the JavaScript code for this ping-pong game with the necessary HTML structure code and CSS style code 
-        into a single HTML file. Ensure that the code can be directly run in a browser to display and play the black 
-        and white 2D ping-pong game.
-    </li>
-    <li>
-        <a href="snakegame.html" target="_blank">Snake Game</a>: <b>Prompt</b> - Please use the P5.js framework to write 
-        a piece of code to create a classic 2D black - and - white style 贪吃蛇游戏 (Snake Game). 
-        The game should be set within a rectangular playing area.
-        <ol>
-            <li> Game Elements:
-                <ul> 
-                    <li> 
-                        Snake: Represent the snake as a series of connected small white squares with a black outline. 
-                        Each square represents a segment of the snake's body. The snake should start with a certain number of segments (e.g., 3) 
-                        and move across the screen in one of four directions: up, down, left, or right. 
-                        The direction of the snake can be changed by the user using the keyboard controls 
-                        (e.g., up, down, left, and right arrow keys). 
-                    </li>
-                    <li>
-                        Food: Create a single small white square with a black outline to represent the food. 
-                        The food should be randomly placed within the playing area, but not on top of the snake's body. 
-                        When the snake's head collides with the food, the snake should grow by one segment, 
-                        and a new piece of food should be randomly placed within the playing area. 
-                    </li>
-                </ul>
-            </li>
-            <li> 
-                Playing Area: The playing area is a large rectangle with a white background and a black border. 
-                The boundaries of the playing area define the limits within which the snake and the food can move.
-            </li>
-            <li> 
-                Scoring System: Implement a simple scoring system. Every time the snake eats the food, 
-                the player's score increases by 1. Display the score at the top of the playing area in black text.
-
-            </li>
-            <li>
-                Buttons: Create two buttons: a "Start" button and a "Reset" button. The "Start" button should be a rectangular 
-                shape with black text on a white background, and clicking it should start the game. 
-                The "Reset" button should also be a rectangular shape with black text on a white background, 
-                and clicking it should reset the game, including the score, the snake's position and length, and the position of the food.
-            </li>
-            <li>
-                Interaction and Movement: 
-                <ul>
-                    <li>
-                        The snake's movement should be updated in each frame of the game loop. 
-                        The snake should move continuously in its current direction until the user changes its direction using the keyboard.
-                    </li>
-                    <li>
-                        When the snake's head collides with the boundaries of the playing area or its own body, 
-                        the game should end. Display a "Game Over" message in black text at the center of the playing area.
-                    </li>
-                    <li>
-                         The food's position should remain fixed until the snake eats it, 
-                         at which point a new random position should be generated for the food.
-                    </li>
-                </ul>
-            </li>
-        </ol>
-        Integrate the JavaScript code for this ping-pong game with the necessary HTML structure code and CSS style code into a single HTML file. Ensure that the code can be directly run in a browser to display and play the black and white 2D ping-pong game.
-    </li>
-
-</ol>
-
-
+<table width=90% align=center> 
+    <tr align=center>
+        <td width=30%><img src="https://s2.loli.net/2025/02/17/imUGDPKrZNYCEy3.png" alt="Ping Pong Game" width="480px" height="270px"></td>
+        <td width=30%><img src="https://s2.loli.net/2025/02/17/lMQC362T4apU1E5.png" alt="Snake Game" width="480px" height="270px"></td>
+        <td width=30%></td>
+    </tr>
+    <tr align=center>
+        <td width=30%><a href="pingpong.html" target="_blank">Ping Pong Game</a></td>
+        <td width=30%><a href="snakegame.html" target="_blank">Snake Game</a></td>
+        <td width=30%></td>
+    </tr>
+</table>
+<br>
+<br>
+<br>
+</div>
 </body>
 </html>
