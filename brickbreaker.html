@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Brick Breaker Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+<script>
+let ball;
+let paddle;
+let bricks = [];
+let score = 0;
+let gameStarted = false;
+let gameOver = false;
+let startButton, resetButton;
+
+// Game constants
+const BRICK_ROWS = 5;
+const BRICK_COLS = 8;
+const BRICK_WIDTH = 60;
+const BRICK_HEIGHT = 20;
+const PADDLE_WIDTH = 80;
+const PADDLE_HEIGHT = 10;
+const BALL_SIZE = 10;
+
+function setup() {
+    createCanvas(600, 500);
+    initializeGame();
+    
+    // Create buttons
+    startButton = createButton('Start');
+resetButton = createButton('Reset');
+
+// Calculate center positions
+let buttonY = height + 20; // 20 pixels below the play area
+let buttonWidth = 80; // Width of each button
+let buttonSpacing = 20; // Space between buttons
+let totalWidth = (buttonWidth * 2) + buttonSpacing;
+let startX = (width - totalWidth) / 2;
+
+// Position the buttons
+startButton.position(startX, buttonY);
+startButton.size(buttonWidth, 30);
+resetButton.position(startX + buttonWidth + buttonSpacing, buttonY);
+resetButton.size(buttonWidth, 30);
+
+// Add some styling to the buttons
+startButton.style('cursor', 'pointer');
+resetButton.style('cursor', 'pointer');
+    
+    startButton.mousePressed(() => {
+        if (!gameStarted && !gameOver) {
+            gameStarted = true;
+        }
+    });
+    
+    resetButton.mousePressed(initializeGame);
+}
+
+function initializeGame() {
+    // Initialize game state
+    gameStarted = false;
+    gameOver = false;
+    score = 0;
+    
+    // Create paddle
+    paddle = {
+        x: width/2 - PADDLE_WIDTH/2,
+        y: height - 30,
+        width: PADDLE_WIDTH,
+        height: PADDLE_HEIGHT
+    };
+    
+    // Create ball
+    ball = {
+        x: width/2,
+        y: height - 40,
+        size: BALL_SIZE,
+        dx: 5,
+        dy: -5
+    };
+    
+    // Create bricks
+    bricks = [];
+    for (let i = 0; i < BRICK_ROWS; i++) {
+        for (let j = 0; j < BRICK_COLS; j++) {
+            bricks.push({
+                x: j * (BRICK_WIDTH + 2) + 50,
+                y: i * (BRICK_HEIGHT + 2) + 50,
+                width: BRICK_WIDTH,
+                height: BRICK_HEIGHT,
+                visible: true
+            });
+        }
+    }
+}
+
+function draw() {
+    background(255);
+    stroke(0);
+    strokeWeight(2);
+    noFill();
+    rect(0, 0, width, height);
+    
+    // Draw score
+    fill(0);
+    noStroke();
+    textSize(20);
+    textAlign(LEFT);
+    text(`Score: ${score}`, 20, 30);
+    
+    // Draw bricks
+    for (let brick of bricks) {
+        if (brick.visible) {
+            fill(0);
+            stroke(255);
+            rect(brick.x, brick.y, brick.width, brick.height);
+        }
+    }
+    
+    // Draw paddle
+    fill(0);
+    stroke(255);
+    rect(paddle.x, paddle.y, paddle.width, paddle.height);
+    
+    // Draw ball
+    fill(255);
+    stroke(0);
+    circle(ball.x, ball.y, ball.size);
+    
+    if (gameOver) {
+        textSize(32);
+        textAlign(CENTER);
+        fill(0);
+        text("Game Over", width/2, height/2);
+        return;
+    }
+    
+    if (!gameStarted) return;
+    
+    // Move paddle
+    if (keyIsDown(LEFT_ARROW)) {
+        paddle.x = max(0, paddle.x - 7);
+    }
+    if (keyIsDown(RIGHT_ARROW)) {
+        paddle.x = min(width - paddle.width, paddle.x + 7);
+    }
+    
+    // Move ball
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+    
+    // Ball collision with walls
+    if (ball.x <= 0 || ball.x >= width) ball.dx *= -1;
+    if (ball.y <= 0) ball.dy *= -1;
+    
+    // Ball collision with paddle
+    if (ball.y >= paddle.y - ball.size/2 &&
+        ball.x >= paddle.x &&
+        ball.x <= paddle.x + paddle.width) {
+        ball.dy *= -1;
+    }
+    
+    // Ball collision with bricks
+    for (let brick of bricks) {
+        if (brick.visible &&
+            ball.x >= brick.x &&
+            ball.x <= brick.x + brick.width &&
+            ball.y >= brick.y &&
+            ball.y <= brick.y + brick.height) {
+            brick.visible = false;
+            ball.dy *= -1;
+            score += 10;
+        }
+    }
+    
+    // Check game over
+    if (ball.y >= height) {
+        gameOver = true;
+    }
+}
+</script>
+</body>
+</html>
