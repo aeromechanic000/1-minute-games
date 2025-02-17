@@ -1,9 +1,179 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-<title>Aeromechanic's Homepage</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autonomous Snake Game</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #222;
+    }
+    canvas {
+      border: 2px solid white;
+    }
+    #restartBtn {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 10px 20px;
+      background-color: #444;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    #restartBtn:hover {
+      background-color: #666;
+    }
+  </style>
 </head>
 <body>
-Hello
+
+<button id="restartBtn" onclick="restartGame()">Restart</button>
+
+<script>
+let snake1, snake2, food;
+let gridSize = 20;
+let gameOver = false;
+
+function setup() {
+  createCanvas(600, 600);
+  frameRate(10);
+  restartGame();
+}
+
+function draw() {
+  background(0);
+  
+  if (gameOver) {
+    fill(255);
+    textSize(32);
+    textAlign(CENTER, CENTER);
+    text('Game Over', width / 2, height / 2);
+    noLoop();
+    return;
+  }
+
+  snake1.update();
+  snake2.update();
+
+  snake1.show();
+  snake2.show();
+
+  if (snake1.eat(food)) {
+    food = createFood();
+  }
+  if (snake2.eat(food)) {
+    food = createFood();
+  }
+
+  food.show();
+
+  if (snake1.collide() || snake2.collide()) {
+    gameOver = true;
+  }
+}
+
+function createFood() {
+  let cols = floor(width / gridSize);
+  let rows = floor(height / gridSize);
+  let foodPos = createVector(floor(random(cols)), floor(random(rows)));
+  foodPos.mult(gridSize);
+  return foodPos;
+}
+
+function Snake(id, snakeColor) {
+  this.id = id;
+  this.body = [];
+  this.body[0] = createVector(floor(random(width / gridSize)) * gridSize, floor(random(height / gridSize)) * gridSize);
+  this.direction = createVector(0, 0);
+  this.length = 1;
+  this.color = snakeColor;
+  
+  this.update = function() {
+    this.autonomousMove();
+    let head = this.body[this.body.length - 1].copy();
+    this.body.shift();
+    this.body.push(head);
+  }
+
+  this.show = function() {
+    for (let i = 0; i < this.body.length; i++) {
+      fill(this.color);
+      noStroke();
+      rect(this.body[i].x, this.body[i].y, gridSize, gridSize);
+    }
+  }
+
+  this.eat = function(pos) {
+    let head = this.body[this.body.length - 1];
+    if (head.x === pos.x && head.y === pos.y) {
+      this.length++;
+      this.body.push(createVector(head.x, head.y));
+      return true;
+    }
+    return false;
+  }
+
+  this.collide = function() {
+    let head = this.body[this.body.length - 1];
+    if (head.x < 0 || head.x >= width || head.y < 0 || head.y >= height) {
+      return true;
+    }
+    for (let i = 0; i < this.body.length - 1; i++) {
+      let part = this.body[i];
+      if (head.x === part.x && head.y === part.y) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  this.autonomousMove = function() {
+    let head = this.body[this.body.length - 1];
+    let moveDirection = createVector(0, 0);
+
+    // Simple autonomous AI: move towards food
+    if (food.x > head.x) {
+      moveDirection.x = 1;
+    } else if (food.x < head.x) {
+      moveDirection.x = -1;
+    }
+    if (food.y > head.y) {
+      moveDirection.y = 1;
+    } else if (food.y < head.y) {
+      moveDirection.y = -1;
+    }
+
+    // Prevent moving directly into the wall (simple logic to avoid reversal of direction)
+    if (this.body.length > 1) {
+      let nextHead = createVector(head.x + moveDirection.x * gridSize, head.y + moveDirection.y * gridSize);
+      if (nextHead.x === this.body[this.body.length - 2].x && nextHead.y === this.body[this.body.length - 2].y) {
+        moveDirection.mult(-1); // reverse direction if the snake tries to collide with itself
+      }
+    }
+
+    this.direction = moveDirection;
+    let newHead = createVector(head.x + this.direction.x * gridSize, head.y + this.direction.y * gridSize);
+    this.body.push(newHead);
+  }
+}
+
+function restartGame() {
+  snake1 = new Snake(1, color(255, 0, 0));  // Red snake
+  snake2 = new Snake(2, color(0, 0, 255));  // Blue snake
+  food = createFood();
+  gameOver = false;
+  loop();  // Restart the game loop
+}
+</script>
+
 </body>
 </html>
+
+
