@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Centipede Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            border: 2px solid black;
+        }
+        .button-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: white;
+            border: 2px solid black;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+<div id="game-container"></div>
+<div class="button-container">
+    <button id="startButton">Start</button>
+    <button id="resetButton">Reset</button>
+</div>
+
+<script>
+const CANVAS_WIDTH = 400;
+const CANVAS_HEIGHT = 600;
+const GRID_SIZE = 20;
+const PLAYER_AREA = 100; // Area at bottom where player can move
+
+let player;
+let bullets = [];
+let centipede = [];
+let mushrooms = [];
+let score = 0;
+let lives = 3;
+let gameStarted = false;
+let gameOver = false;
+let level = 1;
+
+class Player {
+    constructor() {
+        this.reset();
+        this.size = GRID_SIZE - 4;
+        this.speed = 5;
+    }
+
+    reset() {
+        this.x = CANVAS_WIDTH / 2;
+        this.y = CANVAS_HEIGHT - 30;
+    }
+
+    show() {
+        fill(255);
+        stroke(0);
+        triangle(
+            this.x, this.y - this.size/2,
+            this.x - this.size/2, this.y + this.size/2,
+            this.x + this.size/2, this.y + this.size/2
+        );
+    }
+
+    move() {
+        if (keyIsDown(LEFT_ARROW)) {
+            this.x = max(this.size/2, this.x - this.speed);
+        }
+        if (keyIsDown(RIGHT_ARROW)) {
+            this.x = min(CANVAS_WIDTH - this.size/2, this.x + this.speed);
+        }
+        if (keyIsDown(UP_ARROW)) {
+            this.y = max(CANVAS_HEIGHT - PLAYER_AREA, this.y - this.speed);
+        }
+        if (keyIsDown(DOWN_ARROW)) {
+            this.y = min(CANVAS_HEIGHT - this.size/2, this.y + this.speed);
+        }
+    }
+
+    shoot() {
+        bullets.push(new Bullet(this.x, this.y - this.size/2));
+    }
+}
+
+class Bullet {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.speed = 10;
+        this.size = 4;
+    }
+
+    show() {
+        fill(255);
+        stroke(0);
+        rect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+    }
+
+    update() {
+        this.y -= this.speed;
+        return this.y < 0;
+    }
+
+    hits(target) {
+        let d = dist(this.x, this.y, target.x, target.y);
+        return d < (target.size/2 + this.size/2);
+    }
+}
+
+class CentipedeSegment {
+    constructor(x, y, isHead = false) {
+        this.x = x;
+        this.y = y;
+        this.size = GRID_SIZE;
+        this.speed = 2 + level * 0.5;
+        this.direction = 1;
+        this.isHead = isHead;
+        this.moveDown = false;
+    }
+
+    show() {
+        fill(255);
+        stroke(0);
+        circle(this.x, this.y, this.size);
+        if (this.isHead) {
+            // Draw eyes
+            fill(0);
+            circle(this.x + this.direction * 5, this.y - 2, 4);
+            circle(this.x + this.direction * 5, this.y + 2, 4);
+        }
+    }
+
+    update() {
+        if (this.moveDown) {
+            this.y += this.size;
+            this.direction *= -1;
+            this.moveDown = false;
+            return false;
+        }
+
+        this.x += this.speed * this.direction;
+
+        // Check wall collision
+        if (this.x > CANVAS_WIDTH - this.size/2 || this.x < this.size/2) {
+            this.moveDown = true;
+        }
+
+        // Check mushroom collisions
+        for (let mushroom of mushrooms) {
+            if (dist(this.x, this.y, mushroom.x, mushroom.y) < this.size) {
+                this.moveDown = true;
+                break;
+            }
+        }
+
+        return this.y > CANVAS_HEIGHT - PLAYER_AREA;
+    }
+}
+
+class Mushroom {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = GRID_SIZE;
+        this.health = 4;
+    }
+
+    show() {
+        let alpha = map(this.health, 0, 4, 50, 255);
+        fill(255, alpha);
+        stroke(0);
+        rect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+    }
+}
+
+function setup() {
+    let canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+    canvas.parent('game-container');
+    resetGame();
+    
+    document.getElementById('startButton').onclick = startGame;
+    document.getElementById('resetButton').onclick = resetGame;
+}
+
+function draw() {
+    background(0);
+    drawGrid();
+
+    if (gameStarted && !gameOver) {
+        // Update and show player
+        player.move();
+        player.show();
+
+        // Update and show bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            bullets[i].show();
+            if (bullets[i].update()) {
+                bullets.splice(i, 1);
+                continue;
+            }
+
+            // Check bullet collisions with centipede
+            for (let j = centipede.length - 1; j >= 0; j--) {
+                if (bullets[i] && bullets[i].hits(centipede[j])) {
+                    // Create mushroom where segment was hit
+                    mushrooms.push(new Mushroom(centipede[j].x, centipede[j].y));
+                    // Remove segment and bullet
+                    centipede.splice(j, 1);
+                    bullets.splice(i, 1);
+                    score += 10;
+                    break;
+                }
+            }
+
+            // Check bullet collisions with mushrooms
+            for (let j = mushrooms.length - 1; j >= 0; j--) {
+                if (bullets[i] && bullets[i].hits(mushrooms[j])) {
+                    mushrooms[j].health--;
+                    if (mushrooms[j].health <= 0) {
+                        mushrooms.splice(j, 1);
+                        score += 5;
+                    }
+                    bullets.splice(i, 1);
+                    break;
+                }
+            }
+        }
+
+        // Update and show mushrooms
+        for (let mushroom of mushrooms) {
+            mushroom.show();
+        }
+
+        // Update and show centipede
+        let reachedBottom = false;
+        for (let segment of centipede) {
+            if (segment.update()) {
+                reachedBottom = true;
+            }
+            segment.show();
+        }
+
+        if (reachedBottom) {
+            lives--;
+            if (lives <= 0) {
+                gameOver = true;
+            } else {
+                resetCentipede();
+            }
+        }
+
+        // Check if centipede is destroyed
+        if (centipede.length === 0) {
+            level++;
+            resetCentipede();
+        }
+    }
+
+    drawUI();
+}
+
+function drawGrid() {
+    stroke(50);
+    for (let x = 0; x < CANVAS_WIDTH; x += GRID_SIZE) {
+        line(x, 0, x, CANVAS_HEIGHT);
+    }
+    for (let y = 0; y < CANVAS_HEIGHT; y += GRID_SIZE) {
+        line(0, y, CANVAS_WIDTH, y);
+    }
+}
+
+function drawUI() {
+    fill(255);
+    noStroke();
+    textSize(20);
+    textAlign(LEFT);
+    text('Score: ' + score, 10, 25);
+    text('Lives: ' + lives, CANVAS_WIDTH - 100, 25);
+    textAlign(CENTER);
+    text('Level ' + level, CANVAS_WIDTH/2, 25);
+
+    if (gameOver) {
+        textSize(32);
+        fill(255);
+        text('Game Over', CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+        textSize(20);
+        text('Final Score: ' + score, CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 40);
+    }
+}
+
+function keyPressed() {
+    if (keyCode === 32 && gameStarted && !gameOver) { // Space bar
+        player.shoot();
+    }
+}
+
+function resetCentipede() {
+    // Create new centipede
+    centipede = [];
+    let length = 8 + level * 2; // Centipede gets longer with each level
+    for (let i = 0; i < length; i++) {
+        centipede.push(new CentipedeSegment(
+            i * GRID_SIZE + GRID_SIZE/2,
+            GRID_SIZE/2,
+            i === 0
+        ));
+    }
+}
+
+function startGame() {
+    if (!gameStarted && !gameOver) {
+        gameStarted = true;
+    }
+}
+
+function resetGame() {
+    player = new Player();
+    bullets = [];
+    mushrooms = [];
+    score = 0;
+    lives = 3;
+    level = 1;
+    gameStarted = false;
+    gameOver = false;
+    resetCentipede();
+
+    // Add some initial mushrooms
+    for (let i = 0; i < 10; i++) {
+        mushrooms.push(new Mushroom(
+            random(GRID_SIZE, CANVAS_WIDTH - GRID_SIZE),
+            random(GRID_SIZE, CANVAS_HEIGHT - PLAYER_AREA - GRID_SIZE)
+        ));
+    }
+}
+</script>
+</body>
+</html>

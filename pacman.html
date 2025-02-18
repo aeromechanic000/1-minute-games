@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pac-Man Clone</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: black;
+            margin: 0;
+            padding: 20px;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid yellow;
+            color: black;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: yellow;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <div>
+        <button onclick="startGame()">Start</button>
+        <button onclick="resetGame()">Reset</button>
+    </div>
+
+<script>
+let pacman;
+let ghosts = [];
+let grid = [];
+let pellets = [];
+let score = 0;
+let gameState = 'initial';
+let cellSize = 20;
+let rows, cols;
+let mouthAngle = 0;
+let mouthSpeed = 0.1;
+let mouthOpen = true;
+
+class Pacman {
+    constructor() {
+        this.x = cellSize * 1.5;
+        this.y = cellSize * 1.5;
+        this.direction = { x: 0, y: 0 };
+        this.speed = 2;
+        this.radius = cellSize / 2;
+    }
+
+    draw() {
+        fill(255, 255, 0);
+        noStroke();
+        
+        if (mouthOpen) {
+            mouthAngle += mouthSpeed;
+            if (mouthAngle > PI/4) mouthOpen = false;
+        } else {
+            mouthAngle -= mouthSpeed;
+            if (mouthAngle < 0) mouthOpen = true;
+        }
+
+        arc(this.x, this.y, this.radius * 2, this.radius * 2, 
+            mouthAngle + this.getRotation(), -mouthAngle + this.getRotation());
+    }
+
+    getRotation() {
+        if (this.direction.x > 0) return 0;
+        if (this.direction.x < 0) return PI;
+        if (this.direction.y > 0) return PI/2;
+        if (this.direction.y < 0) return -PI/2;
+        return 0;
+    }
+
+    move() {
+        let nextX = this.x + this.direction.x * this.speed;
+        let nextY = this.y + this.direction.y * this.speed;
+        
+        if (this.canMove(nextX, nextY)) {
+            this.x = nextX;
+            this.y = nextY;
+        }
+        this.eatPellet();
+    }
+
+    canMove(x, y) {
+        let gridX = floor(x / cellSize);
+        let gridY = floor(y / cellSize);
+        return grid[gridY] && grid[gridY][gridX] === 0;
+    }
+
+    eatPellet() {
+        for (let i = pellets.length - 1; i >= 0; i--) {
+            let d = dist(this.x, this.y, pellets[i].x, pellets[i].y);
+            if (d < this.radius) {
+                pellets.splice(i, 1);
+                score += 10;
+            }
+        }
+    }
+}
+
+class Ghost {
+    constructor(x, y, color) {
+        let validPos = this.findValidPosition(x, y);
+        this.x = validPos.x;
+        this.y = validPos.y;
+        this.color = color;
+        this.direction = { x: 1, y: 0 };
+        this.speed = 1.5;
+        this.radius = cellSize / 2;
+        this.moveCounter = 0;
+    }
+
+    findValidPosition(preferredX, preferredY) {
+        let gridX = floor(preferredX / cellSize);
+        let gridY = floor(preferredY / cellSize);
+        
+        if (!grid[gridY] || grid[gridY][gridX] !== 0) {
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    if (grid[i][j] === 0) {
+                        return {
+                            x: j * cellSize + cellSize/2,
+                            y: i * cellSize + cellSize/2
+                        };
+                    }
+                }
+            }
+        }
+        
+        return {
+            x: preferredX,
+            y: preferredY
+        };
+    }
+
+    draw() {
+        fill(this.color);
+        noStroke();
+        ellipse(this.x, this.y, this.radius * 2);
+    }
+
+    move() {
+        this.moveCounter++;
+        
+        if (this.moveCounter % 30 === 0) {
+            this.updateDirection();
+        }
+
+        let nextX = this.x + this.direction.x * this.speed;
+        let nextY = this.y + this.direction.y * this.speed;
+
+        if (this.canMove(nextX, nextY)) {
+            this.x = nextX;
+            this.y = nextY;
+        } else {
+            this.updateDirection();
+        }
+    }
+
+    updateDirection() {
+        let possibleDirections = this.getValidDirections();
+        
+        if (possibleDirections.length > 0) {
+            if (random() < 0.7) {
+                possibleDirections.sort((a, b) => {
+                    let distA = dist(this.x + a.x * cellSize, this.y + a.y * cellSize, pacman.x, pacman.y);
+                    let distB = dist(this.x + b.x * cellSize, this.y + b.y * cellSize, pacman.x, pacman.y);
+                    return distA - distB;
+                });
+                this.direction = possibleDirections[0];
+            } else {
+                this.direction = random(possibleDirections);
+            }
+        }
+    }
+
+    getValidDirections() {
+        let directions = [
+            {x: 1, y: 0},
+            {x: -1, y: 0},
+            {x: 0, y: 1},
+            {x: 0, y: -1}
+        ];
+
+        return directions.filter(dir => {
+            let nextX = this.x + dir.x * cellSize;
+            let nextY = this.y + dir.y * cellSize;
+            return this.canMove(nextX, nextY);
+        });
+    }
+
+    canMove(x, y) {
+        let gridX = floor(x / cellSize);
+        let gridY = floor(y / cellSize);
+        
+        if (gridX < 0 || gridX >= cols || gridY < 0 || gridY >= rows) {
+            return false;
+        }
+        
+        return grid[gridY][gridX] === 0;
+    }
+}
+
+function generateMaze() {
+    rows = floor(height / cellSize);
+    cols = floor(width / cellSize);
+    
+    for (let i = 0; i < rows; i++) {
+        grid[i] = [];
+        for (let j = 0; j < cols; j++) {
+            grid[i][j] = 1;
+        }
+    }
+
+    let startY = 1;
+    let startX = 1;
+    let frontier = [];
+    
+    grid[startY][startX] = 0;
+    addFrontiers(startY, startX, frontier);
+
+while (frontier.length > 0) {
+        let randomIndex = floor(random(frontier.length));
+        let current = frontier[randomIndex];
+        frontier.splice(randomIndex, 1);
+
+        let neighbors = getPathNeighbors(current.y, current.x);
+        
+        if (neighbors.length > 0) {
+            let neighbor = random(neighbors);
+            
+            grid[current.y][current.x] = 0;
+            grid[(current.y + neighbor.y) / 2][(current.x + neighbor.x) / 2] = 0;
+            
+            addFrontiers(current.y, current.x, frontier);
+        }
+    }
+
+    // Add more open paths for ghosts
+    for (let i = 1; i < rows - 1; i++) {
+        for (let j = 1; j < cols - 1; j++) {
+            if (grid[i][j] === 1 && random() < 0.4) {
+                if (countSurroundingPaths(i, j) >= 2) {
+                    grid[i][j] = 0;
+                }
+            }
+        }
+    }
+
+    // Ensure starting areas are clear
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            grid[i][j] = 0; // Clear top-left (Pacman start)
+            grid[i][cols-1-j] = 0; // Clear top-right
+            grid[rows-1-i][j] = 0; // Clear bottom-left
+            grid[rows-1-i][cols-1-j] = 0; // Clear bottom-right
+        }
+    }
+
+    // Create pellets
+    for (let i = 1; i < rows - 1; i++) {
+        for (let j = 1; j < cols - 1; j++) {
+            if (grid[i][j] === 0 && !(i === 1 && j === 1)) {
+                pellets.push({ 
+                    x: j * cellSize + cellSize/2, 
+                    y: i * cellSize + cellSize/2 
+                });
+            }
+        }
+    }
+}
+
+function addFrontiers(y, x, frontier) {
+    let directions = [
+        {dy: -2, dx: 0},
+        {dy: 2, dx: 0},
+        {dy: 0, dx: -2},
+        {dy: 0, dx: 2}
+    ];
+
+    for (let dir of directions) {
+        let newY = y + dir.dy;
+        let newX = x + dir.dx;
+        
+        if (newY > 0 && newY < rows - 1 && newX > 0 && newX < cols - 1) {
+            if (grid[newY][newX] === 1) {
+                let frontierCell = {y: newY, x: newX};
+                if (!frontier.some(cell => cell.y === newY && cell.x === newX)) {
+                    frontier.push(frontierCell);
+                }
+            }
+        }
+    }
+}
+
+function getPathNeighbors(y, x) {
+    let neighbors = [];
+    let directions = [
+        {dy: -2, dx: 0},
+        {dy: 2, dx: 0},
+        {dy: 0, dx: -2},
+        {dy: 0, dx: 2}
+    ];
+
+    for (let dir of directions) {
+        let newY = y + dir.dy;
+        let newX = x + dir.dx;
+        
+        if (newY > 0 && newY < rows - 1 && newX > 0 && newX < cols - 1) {
+            if (grid[newY][newX] === 0) {
+                neighbors.push({y: newY, x: newX});
+            }
+        }
+    }
+    return neighbors;
+}
+
+function countSurroundingPaths(y, x) {
+    let count = 0;
+    let directions = [
+        {dy: -1, dx: 0},
+        {dy: 1, dx: 0},
+        {dy: 0, dx: -1},
+        {dy: 0, dx: 1}
+    ];
+
+    for (let dir of directions) {
+        let newY = y + dir.dy;
+        let newX = x + dir.dx;
+        if (grid[newY] && grid[newY][newX] === 0) {
+            count++;
+        }
+    }
+    return count;
+}
+
+function setup() {
+    createCanvas(400, 400);
+    resetGame();
+}
+
+function draw() {
+    background(0);
+    
+    if (gameState === 'playing') {
+        // Draw maze
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                if (grid[i][j] === 1) {
+                    fill(0, 0, 255);
+                    noStroke();
+                    rect(j * cellSize, i * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        // Draw pellets
+        fill(255);
+        noStroke();
+        for (let pellet of pellets) {
+            ellipse(pellet.x, pellet.y, 4);
+        }
+
+        // Update and draw Pac-Man
+        pacman.move();
+        pacman.draw();
+
+        // Update and draw ghosts
+        for (let ghost of ghosts) {
+            ghost.move();
+            ghost.draw();
+
+            // Check collision with Pac-Man
+            let d = dist(ghost.x, ghost.y, pacman.x, pacman.y);
+            if (d < ghost.radius + pacman.radius - 5) {
+                gameState = 'gameover';
+            }
+        }
+
+        // Draw score
+        fill(255);
+        textSize(20);
+        textAlign(LEFT, TOP);
+        text('Score: ' + score, 10, 10);
+
+        // Check win condition
+        if (pellets.length === 0) {
+            gameState = 'win';
+        }
+    } else if (gameState === 'gameover') {
+        fill(255, 0, 0);
+        textSize(32);
+        textAlign(CENTER, CENTER);
+        text('GAME OVER', width/2, height/2);
+        text('Score: ' + score, width/2, height/2 + 40);
+    } else if (gameState === 'win') {
+        fill(255, 255, 0);
+        textSize(32);
+        textAlign(CENTER, CENTER);
+        text('YOU WIN!', width/2, height/2);
+        text('Score: ' + score, width/2, height/2 + 40);
+    }
+}
+
+function keyPressed() {
+    if (gameState === 'playing') {
+        switch(keyCode) {
+            case LEFT_ARROW:
+                pacman.direction = { x: -1, y: 0 };
+                break;
+            case RIGHT_ARROW:
+                pacman.direction = { x: 1, y: 0 };
+                break;
+            case UP_ARROW:
+                pacman.direction = { x: 0, y: -1 };
+                break;
+            case DOWN_ARROW:
+                pacman.direction = { x: 0, y: 1 };
+                break;
+        }
+    }
+}
+
+function startGame() {
+    if (gameState !== 'playing') {
+        resetGame();
+        gameState = 'playing';
+    }
+}
+
+function resetGame() {
+    grid = [];
+    pellets = [];
+    score = 0;
+    generateMaze();
+    
+    pacman = new Pacman();
+    
+    ghosts = [
+        new Ghost(width - cellSize * 2, cellSize * 2, 'red'),
+        new Ghost(width - cellSize * 2, height - cellSize * 2, 'pink'),
+        new Ghost(cellSize * 2, height - cellSize * 2, 'cyan')
+    ];
+    
+    gameState = 'initial';
+}
+</script>
+</body>
+</html>

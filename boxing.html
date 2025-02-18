@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Top-Down Boxing Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #333;
+            margin: 0;
+            padding: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 600px;
+            height: 700px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: -20px;
+        }
+        .hud {
+            position: relative;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #222;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .player-stats, .opponent-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 200px;
+        }
+        .match-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .health-bar {
+            width: 200px;
+            height: 20px;
+            background: #444;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .health-fill {
+            height: 100%;
+            background: #f00;
+            transition: width 0.3s;
+        }
+        .stamina-bar {
+            width: 150px;
+            height: 10px;
+            background: #444;
+            border: 2px solid #fff;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .stamina-fill {
+            height: 100%;
+            background: #0f0;
+            transition: width 0.3s;
+        }
+        .controls {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 30px;
+            background: #555;
+            border: 2px solid #fff;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #666;
+        }
+        #round {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #timer {
+            font-size: 32px;
+            font-weight: bold;
+            color: #ffff00;
+        }
+        .canvas-container {
+            border: 3px solid #fff;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: -10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="hud">
+            <div class="player-stats">
+                <div class="health-bar">
+                    <div id="player-health" class="health-fill" style="width: 100%"></div>
+                </div>
+                <div class="stamina-bar">
+                    <div id="player-stamina" class="stamina-fill" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="match-info">
+                <div id="round">Round 1</div>
+                <div id="timer">3:00</div>
+            </div>
+            <div class="opponent-stats">
+                <div class="health-bar">
+                    <div id="opponent-health" class="health-fill" style="width: 100%"></div>
+                </div>
+                <div class="stamina-bar">
+                    <div id="opponent-stamina" class="stamina-fill" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="canvas-container" id="canvas-container">
+            <!-- P5.js canvas will be inserted here -->
+        </div>
+        <div class="controls">
+            <button onclick="startGame()">Start Fight</button>
+            <button onclick="resetGame()">Reset</button>
+        </div>
+    </div>
+
+<script>
+const DEBUG = false;
+let player;
+let opponent;
+let ai;
+let ring;
+let roundStartTime;
+let score = 0;
+let effects = [];
+let gameState = 'initial';
+let currentRound = 1;
+let roundTime = 180;
+
+class Boxer {
+    constructor(isPlayer, x, y) {
+        this.isPlayer = isPlayer;
+        this.x = x;
+        this.y = y;
+        this.width = 40;
+        this.height = 40;
+        this.armLength = 30;
+        this.armWidth = 10;
+        this.rotation = isPlayer ? 0 : PI;
+        this.health = 100;
+        this.stamina = 100;
+        this.staminaRegen = 0.2;
+        this.speed = 3;
+        this.state = 'idle';
+        this.actionTimer = 0;
+        this.stunned = false;
+        this.blocking = false;
+        this.lastPunchWasRight = false;
+        
+        // Arm positions
+        this.leftArm = {
+            angle: isPlayer ? -PI/4 : -3*PI/4,
+            extended: false
+        };
+        this.rightArm = {
+            angle: isPlayer ? PI/4 : 3*PI/4,
+            extended: false
+        };
+
+        // Initialize UI
+        this.updateHealthBar();
+        this.updateStaminaBar();
+    }
+
+    update() {
+        // Regenerate stamina
+        if (this.stamina < 100) {
+            this.stamina = min(100, this.stamina + this.staminaRegen);
+            this.updateStaminaBar();
+        }
+
+        // Update arm positions based on state
+        if (this.state === 'idle') {
+            this.updateIdleArms();
+        } else if (this.state.includes('punch')) {
+            this.updatePunchingArms();
+        } else if (this.blocking) {
+            this.updateBlockingArms();
+        }
+
+        // Reset state if action is complete
+        if (this.state !== 'idle' && this.actionTimer > 0) {
+            this.actionTimer--;
+            if (this.actionTimer <= 0) {
+                this.state = 'idle';
+                this.blocking = false;
+                this.leftArm.extended = false;
+                this.rightArm.extended = false;
+            }
+        }
+    }
+
+    draw() {
+        push();
+        translate(this.x, this.y);
+        rotate(this.rotation);
+
+        // Draw body
+        fill(this.isPlayer ? '#4a90e2' : '#e24a4a');
+        noStroke();
+        rectMode(CENTER);
+        rect(0, 0, this.width, this.height);
+
+        // Draw arms
+        fill(this.isPlayer ? '#2980b9' : '#c0392b');
+        
+        // Left arm
+        push();
+        translate(-this.width/4, 0);
+        rotate(this.leftArm.angle);
+        rect(0, this.armLength/2, this.armWidth, 
+             this.leftArm.extended ? this.armLength * 1.5 : this.armLength);
+        pop();
+
+        // Right arm
+        push();
+        translate(this.width/4, 0);
+        rotate(this.rightArm.angle);
+        rect(0, this.armLength/2, this.armWidth, 
+             this.rightArm.extended ? this.armLength * 1.5 : this.armLength);
+        pop();
+
+        // Draw direction indicator
+        fill(255);
+        triangle(0, -this.height/2, 
+                -5, -this.height/2 - 10, 
+                5, -this.height/2 - 10);
+
+        if (DEBUG) {
+            noFill();
+            stroke(255, 0, 0);
+            ellipse(0, 0, this.width * 1.2 * 2);
+        }
+
+        pop();
+    }
+
+    updateIdleArms() {
+        let targetLeft = this.isPlayer ? -PI/4 : -3*PI/4;
+        let targetRight = this.isPlayer ? PI/4 : 3*PI/4;
+        
+        this.leftArm.angle = lerp(this.leftArm.angle, targetLeft, 0.2);
+        this.rightArm.angle = lerp(this.rightArm.angle, targetRight, 0.2);
+        this.leftArm.extended = false;
+        this.rightArm.extended = false;
+    }
+
+    updatePunchingArms() {
+        let punchProgress = (20 - this.actionTimer) / 20;
+        
+        if (this.state.includes('right')) {
+            this.rightArm.extended = true;
+            this.rightArm.angle = lerp(this.isPlayer ? PI/4 : 3*PI/4, 0, punchProgress);
+        } else {
+            this.leftArm.extended = true;
+            this.leftArm.angle = lerp(this.isPlayer ? -PI/4 : -3*PI/4, 0, punchProgress);
+        }
+    }
+
+    updateBlockingArms() {
+        let targetLeft = this.isPlayer ? -PI/8 : -7*PI/8;
+        let targetRight = this.isPlayer ? PI/8 : 7*PI/8;
+        
+        this.leftArm.angle = lerp(this.leftArm.angle, targetLeft, 0.3);
+        this.rightArm.angle = lerp(this.rightArm.angle, targetRight, 0.3);
+        this.leftArm.extended = true;
+        this.rightArm.extended = true;
+    }
+
+    punch(type) {
+        if (this.stamina < 20 || this.state !== 'idle') return false;
+        
+        let staminaCost = type === 'jab' ? 15 : 25;
+        let recovery = type === 'jab' ? 15 : 25;
+        
+        if (this.stamina >= staminaCost) {
+            let arm = this.lastPunchWasRight ? '_left' : '_right';
+            this.lastPunchWasRight = !this.lastPunchWasRight;
+            
+            this.state = 'punch_' + type + arm;
+            this.actionTimer = recovery;
+            this.stamina -= staminaCost;
+            this.updateStaminaBar();
+            
+            if (arm === '_right') {
+                this.rightArm.angle = 0;
+                this.rightArm.extended = true;
+            } else {
+                this.leftArm.angle = 0;
+                this.leftArm.extended = true;
+            }
+            
+            return true;
+        }
+        return false;
+    }
+
+    move(dx, dy) {
+        if (this.stunned) return;
+        
+        let speed = this.blocking ? this.speed * 0.5 : this.speed;
+        this.x += dx * speed;
+        this.y += dy * speed;
+        
+        if (dx !== 0 || dy !== 0) {
+            let targetRotation = atan2(dy, dx);
+            let angleDiff = targetRotation - this.rotation;
+            angleDiff = (angleDiff + PI) % (2 * PI) - PI;
+            this.rotation += angleDiff * 0.1;
+        }
+    }
+
+    block() {
+        if (this.state === 'idle' && this.stamina >= 10) {
+            this.blocking = true;
+            this.state = 'block';
+            this.actionTimer = 30;
+            this.stamina -= 10;
+            this.updateStaminaBar();
+        }
+    }
+
+    takeDamage(amount, attackerAngle) {
+        let angleDiff = abs((attackerAngle - this.rotation + PI) % (2 * PI) - PI);
+        
+        if (this.blocking && angleDiff < PI/2) {
+            amount *= 0.3;
+        } else if (angleDiff > 2*PI/3) {
+            amount *= 1.5;
+        }
+
+        this.health = max(0, this.health - amount);
+        this.stunned = true;
+        setTimeout(() => this.stunned = false, 500);
+        this.updateHealthBar();
+        
+        if (this.health <= 0) {
+            gameState = 'gameover';
+        }
+    }
+
+    updateHealthBar() {
+        let barId = this.isPlayer ? 'player-health' : 'opponent-health';
+        const healthBar = document.getElementById(barId);
+        if (healthBar) {
+            healthBar.style.width = `${this.health}%`;
+        }
+    }
+
+    updateStaminaBar() {
+        let barId = this.isPlayer ? 'player-stamina' : 'opponent-stamina';
+        const staminaBar = document.getElementById(barId);
+        if (staminaBar) {
+            staminaBar.style.width = `${this.stamina}%`;
+        }
+    }
+}
+
+class AI {
+    constructor(boxer) {
+        this.boxer = boxer;
+        this.difficulty = 1;
+        this.decisionTimer = 0;
+        this.currentStrategy = 'neutral';
+        this.reactionTime = 30;
+        this.aggression = 0.5;
+        this.targetPosition = null;
+        this.circlingDirection = 1;
+    }
+
+    update() {
+        if (this.decisionTimer <= 0) {
+            this.makeDecision();
+        }
+        this.decisionTimer--;
+        this.executeMovement();
+    }
+
+    makeDecision() {
+        if (this.boxer.state !== 'idle') return;
+
+        let distanceToPlayer = dist(this.boxer.x, this.boxer.y, player.x, player.y);
+        let angleToPlayer = atan2(player.y - this.boxer.y, player.x - this.boxer.x);
+        let isInRange = distanceToPlayer < 80;
+
+        this.updateStrategy(distanceToPlayer);
+
+        // Defensive actions
+        if (player.state.includes('punch') && random() < 0.7) {
+            if (distanceToPlayer < 100) {
+                if (random() < 0.5) {
+                    this.boxer.block();
+                } else {
+                    this.targetPosition = this.getCirclingPosition();
+                }
+            }
+            this.decisionTimer = this.reactionTime;
+            return;
+        }
+
+        // Offensive actions
+        if (isInRange && this.boxer.stamina > 30) {
+            let attackChance = this.aggression;
+            if (player.state.includes('punch')) attackChance *= 1.5;
+
+            if (random() < attackChance) {
+                let attacks = ['jab', 'hook'];
+                let selectedAttack = random(attacks);
+                this.boxer.punch(selectedAttack);
+                this.decisionTimer = this.reactionTime * 1.5;
+                return;
+            }
+        }
+
+        // Movement decision
+        if (!isInRange) {
+            this.targetPosition = {
+                x: player.x + random(-50, 50),
+                y: player.y + random(-50, 50)
+            };
+        } else if (random() < 0.3) {
+            this.targetPosition = this.getCirclingPosition();
+            this.circlingDirection *= random() < 0.2 ? -1 : 1;
+        }
+
+        this.decisionTimer = this.reactionTime;
+    }
+
+    executeMovement() {
+        if (!this.targetPosition) return;
+
+        let dx = this.targetPosition.x - this.boxer.x;
+        let dy = this.targetPosition.y - this.boxer.y;
+        let distance = sqrt(dx * dx + dy * dy);
+
+        if (distance > 5) {
+            this.boxer.move(dx / distance, dy / distance);
+        } else {
+            this.targetPosition = null;
+        }
+    }
+
+    getCirclingPosition() {
+        let angle = atan2(this.boxer.y - player.y, this.boxer.x - player.x);
+        angle += this.circlingDirection * PI/2;
+        let radius = 100;
+        return {
+            x: player.x + cos(angle) * radius,
+            y: player.y + sin(angle) * radius
+        };
+    }
+
+    updateStrategy(distanceToPlayer) {
+        if (this.boxer.health < 30) {
+            this.currentStrategy = 'defensive';
+            this.aggression = 0.3;
+        } else if (player.health < 30) {
+            this.currentStrategy = 'aggressive';
+            this.aggression = 0.8;
+        } else if (distanceToPlayer < 60) {
+            this.currentStrategy = 'boxing';
+            this.aggression = 0.6;
+        } else {
+            this.currentStrategy = 'neutral';
+            this.aggression = 0.5;
+        }
+
+        if (this.boxer.stamina < 30) {
+            this.aggression *= 0.5;
+        }
+    }
+
+    increaseDifficulty() {
+        this.difficulty += 0.2;
+        this.reactionTime = max(15, this.reactionTime - 2);
+        this.aggression = min(0.9, this.aggression + 0.1);
+    }
+}
+
+class Ring {
+    constructor() {
+        this.width = 600;
+        this.height = 600;
+        this.cornerRadius = 60;
+    }
+
+    draw() {
+        // Draw ring floor
+        fill('#3a3a3a');
+        noStroke();
+        rect(0, 0, this.width, this.height);
+        
+        // Draw ring ropes
+        stroke('#ff0000');
+        strokeWeight(3);
+        noFill();
+        rect(20, 20, this.width - 40, this.height - 40, this.cornerRadius);
+        
+        // Draw center circle
+        stroke('#ffffff');
+        strokeWeight(2);
+        ellipse(this.width/2, this.height/2, 100, 100);
+        
+        // Draw corner padding
+        fill('#ffff00');
+        noStroke();
+        rect(0, 0, 40, 40, this.cornerRadius);
+        rect(this.width - 40, 0, 40, 40, this.cornerRadius);
+        rect(0, this.height - 40, 40, 40, this.cornerRadius);
+        rect(this.width - 40, this.height - 40, 40, 40, this.cornerRadius);
+    }
+
+    constrainBoxer(boxer) {
+        boxer.x = constrain(boxer.x, 40, this.width - 40);
+        boxer.y = constrain(boxer.y, 40, this.height - 40);
+    }
+}
+
+class Effect {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.lifetime = 15;
+        this.size = 20;
+    }
+
+    update() {
+        this.lifetime--;
+        this.size += 2;
+        return this.lifetime > 0;
+    }
+
+    draw() {
+        push();
+        translate(this.x, this.y);
+        if (this.type === 'hit') {
+            stroke(255, 255, 0);
+            strokeWeight(2);
+            noFill();
+            for (let i = 0; i < 8; i++) {
+                let angle = i * PI/4 + frameCount * 0.2;
+                line(cos(angle) * this.size, sin(angle) * this.size,
+                     cos(angle) * (this.size - 10), sin(angle) * (this.size - 10));
+            }
+        }
+        pop();
+    }
+}
+
+function checkPunchCollision(attacker, defender) {
+    if (!attacker.state.includes('punch')) return false;
+
+    let attackerAngle = attacker.rotation;
+    let punchReach = attacker.armLength * 1.5;
+    
+    let punchX = attacker.x + cos(attackerAngle) * punchReach;
+    let punchY = attacker.y + sin(attackerAngle) * punchReach;
+
+    let distance = dist(punchX, punchY, defender.x, defender.y);
+    let angleToDefender = atan2(defender.y - attacker.y, defender.x - attacker.x);
+    let angleDiff = abs((angleToDefender - attackerAngle + TWO_PI) % TWO_PI);
+
+    let hitDistance = defender.width * 1.2;
+    let hitAngle = PI/2;
+
+    if (DEBUG) {
+        push();
+        stroke(255, 0, 0);
+        noFill();
+        line(attacker.x, attacker.y, punchX, punchY);
+        ellipse(punchX, punchY, 10, 10);
+        pop();
+    }
+
+    if (distance < hitDistance && angleDiff < hitAngle) {
+        return {
+            type: attacker.state.split('_')[1],
+            angle: attackerAngle,
+            damage: attacker.state.includes('jab') ? 8 : 15
+        };
+    }
+    return false;
+}
+
+function setup() {
+    let canvas = createCanvas(600, 600);
+    canvas.parent('canvas-container');
+    resetGame();
+}
+
+function resetGame() {
+    // Create new instances
+    player = new Boxer(true, 200, 300);
+    opponent = new Boxer(false, 400, 300);
+    ai = new AI(opponent);
+    ring = new Ring();
+    effects = [];
+
+    // Reset game state variables
+    gameState = 'initial';
+    currentRound = 1;
+    roundTime = 180;
+    score = 0;
+
+    // Explicitly reset all UI elements
+    document.getElementById('player-health').style.width = '100%';
+    document.getElementById('opponent-health').style.width = '100%';
+    document.getElementById('player-stamina').style.width = '100%';
+    document.getElementById('opponent-stamina').style.width = '100%';
+
+    // Reset displays
+    updateRoundDisplay();
+    updateTimerDisplay();
+
+    // Ensure boxers' stats are properly initialized
+    player.health = 100;
+    player.stamina = 100;
+    opponent.health = 100;
+    opponent.stamina = 100;
+
+    // Reset boxer states
+    player.state = 'idle';
+    opponent.state = 'idle';
+    player.blocking = false;
+    opponent.blocking = false;
+    player.stunned = false;
+    opponent.stunned = false;
+
+    // Reset AI
+    ai.decisionTimer = 0;
+    ai.targetPosition = null;
+    ai.currentStrategy = 'neutral';
+    ai.aggression = 0.5;
+}
+
+function draw() {
+    background('#1a1a1a');
+    ring.draw();
+
+    switch(gameState) {
+        case 'playing':
+            updateGame();
+            break;
+        case 'round_end':
+            drawRoundEnd();
+            break;
+        case 'gameover':
+            drawGameOver();
+            break;
+        default:
+            drawTitle();
+    }
+}
+
+function updateGame() {
+    // Update round timer
+    if (frameCount % 60 === 0) {
+        roundTime--;
+        updateTimerDisplay();
+        
+        if (roundTime <= 0) {
+            endRound();
+        }
+    }
+
+    // Update entities
+    player.update();
+    opponent.update();
+    ai.update();
+
+    // Constrain boxers to ring
+    ring.constrainBoxer(player);
+    ring.constrainBoxer(opponent);
+
+    // Handle continuous movement input
+    handleContinuousInput();
+
+    // Check collisions
+    let playerHit = checkPunchCollision(player, opponent);
+    if (playerHit) {
+        opponent.takeDamage(playerHit.damage, playerHit.angle);
+        effects.push(new Effect(opponent.x, opponent.y, 'hit'));
+        score += playerHit.damage;
+    }
+
+    let opponentHit = checkPunchCollision(opponent, player);
+    if (opponentHit) {
+        player.takeDamage(opponentHit.damage, opponentHit.angle);
+        effects.push(new Effect(player.x, player.y, 'hit'));
+    }
+
+    // Update and draw effects
+    effects = effects.filter(effect => effect.update());
+    effects.forEach(effect => effect.draw());
+
+    // Draw debug information if enabled
+    if (DEBUG) {
+        drawHitboxes();
+        drawPunchRange(player);
+        drawPunchRange(opponent);
+    }
+
+    // Draw boxers
+    player.draw();
+    opponent.draw();
+}
+
+function handleContinuousInput() {
+    if (gameState !== 'playing') return;
+    
+    let dx = 0, dy = 0;
+    
+    if (keyIsDown(65)) dx -= 1; // A
+    if (keyIsDown(68)) dx += 1; // D
+    if (keyIsDown(87)) dy -= 1; // W
+    if (keyIsDown(83)) dy += 1; // S
+
+    if (dx !== 0 || dy !== 0) {
+        let magnitude = sqrt(dx * dx + dy * dy);
+        player.move(dx / magnitude, dy / magnitude);
+    }
+}
+
+function keyPressed() {
+    if (gameState !== 'playing') return;
+
+    switch(keyCode) {
+        case 74: // J
+            player.punch('jab');
+            break;
+        case 75: // K
+            player.punch('hook');
+            break;
+        case 32: // Space
+            player.block();
+            break;
+    }
+}
+
+function startGame() {
+    if (gameState !== 'playing') {
+        gameState = 'playing';
+        roundStartTime = frameCount;
+    }
+}
+
+function endRound() {
+    gameState = 'round_end';
+    currentRound++;
+    
+    if (currentRound > 3) {
+        gameState = 'gameover';
+    } else {
+        setTimeout(() => {
+            roundTime = 180;
+            updateRoundDisplay();
+            updateTimerDisplay();
+            player.health = min(100, player.health + 20);
+            opponent.health = min(100, opponent.health + 20);
+            player.stamina = 100;
+            opponent.stamina = 100;
+            player.updateHealthBar();
+            opponent.updateHealthBar();
+            player.updateStaminaBar();
+            opponent.updateStaminaBar();
+            ai.increaseDifficulty();
+            gameState = 'playing';
+            roundStartTime = frameCount;
+        }, 3000);
+    }
+}
+
+function drawRoundEnd() {
+    fill(255);
+    textSize(32);
+    textAlign(CENTER, CENTER);
+    text(`Round ${currentRound-1} Complete!`, width/2, height/2);
+    textSize(24);
+    text(`Score: ${score}`, width/2, height/2 + 40);
+}
+
+function drawGameOver() {
+    fill(255);
+    textSize(40);
+    textAlign(CENTER, CENTER);
+    text('Fight Complete!', width/2, height/2 - 40);
+    textSize(32);
+    let winner = player.health > opponent.health ? 'You Win!' : 'You Lose!';
+    text(winner, width/2, height/2);
+    textSize(24);
+    text(`Final Score: ${score}`, width/2, height/2 + 40);
+}
+
+function drawTitle() {
+    fill(255);
+    textSize(48);
+    textAlign(CENTER, CENTER);
+    text('TOP-DOWN BOXING', width/2, height/2 - 40);
+    textSize(24);
+    text('Press Start to begin', width/2, height/2 + 40);
+    textSize(18);
+    text('Controls: WASD to move, J for jab, K for hook, Space to block', width/2, height/2 + 80);
+}
+
+function updateTimerDisplay() {
+    let minutes = floor(roundTime / 60);
+    let seconds = roundTime % 60;
+    document.getElementById('timer').innerText = 
+        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function updateRoundDisplay() {
+    document.getElementById('round').innerText = `Round ${currentRound}`;
+}
+
+function drawHitboxes() {
+    if (!DEBUG) return;
+    push();
+    noFill();
+    stroke(0, 255, 0);
+    ellipse(player.x, player.y, player.width * 1.2 * 2);
+    stroke(255, 0, 0);
+    ellipse(opponent.x, opponent.y, opponent.width * 1.2 * 2);
+    pop();
+}
+
+function drawPunchRange(boxer) {
+    if (DEBUG && boxer.state.includes('punch')) {
+        push();
+        translate(boxer.x, boxer.y);
+        rotate(boxer.rotation);
+        noFill();
+        stroke(255, 100);
+        arc(0, 0, boxer.armLength * 3, boxer.armLength * 3, -PI/4, PI/4);
+        pop();
+    }
+}
+</script>
+</body>
+</html>
