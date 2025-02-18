@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rock Paper Scissors</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .button-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #4CAF50;
+            color: white;
+            min-width: 120px;
+        }
+        button:hover {
+            transform: scale(1.05);
+            background: #45a049;
+        }
+        .choice-button {
+            background: #2196F3;
+        }
+        .choice-button:hover {
+            background: #1976D2;
+        }
+        .reset-button {
+            background: #f44336;
+        }
+        .reset-button:hover {
+            background: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <div class="button-container" id="choiceButtons"></div>
+    <div class="button-container" id="controlButtons"></div>
+</div>
+
+<script>
+const CANVAS_WIDTH = 600;
+const CANVAS_HEIGHT = 400;
+
+let playerChoice = '';
+let computerChoice = '';
+let playerScore = 0;
+let computerScore = 0;
+let result = '';
+let gameStarted = false;
+let resultAnimation = 0;
+let choices = ['Rock', 'Paper', 'Scissors'];
+let symbols = {
+    'Rock': '✊',
+    'Paper': '✋',
+    'Scissors': '✌️'
+};
+
+function setup() {
+    let canvas = createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+    canvas.parent('gameContainer');
+
+    // Create choice buttons
+    choices.forEach(choice => {
+        let btn = createButton(`${symbols[choice]} ${choice}`);
+        btn.parent('choiceButtons');
+        btn.addClass('choice-button');
+        btn.mousePressed(() => makeChoice(choice));
+    });
+
+    // Create reset button
+    let resetBtn = createButton('Reset Game');
+    resetBtn.parent('controlButtons');
+    resetBtn.addClass('reset-button');
+    resetBtn.mousePressed(resetGame);
+}
+
+function makeChoice(choice) {
+    if (!gameStarted) gameStarted = true;
+    
+    playerChoice = choice;
+    computerChoice = choices[floor(random(3))];
+    resultAnimation = 255;
+    
+    // Determine winner
+    if (playerChoice === computerChoice) {
+        result = "It's a tie!";
+    } else if (
+        (playerChoice === 'Rock' && computerChoice === 'Scissors') ||
+        (playerChoice === 'Paper' && computerChoice === 'Rock') ||
+        (playerChoice === 'Scissors' && computerChoice === 'Paper')
+    ) {
+        result = 'You win!';
+        playerScore++;
+    } else {
+        result = 'Computer wins!';
+        computerScore++;
+    }
+}
+
+function resetGame() {
+    playerScore = 0;
+    computerScore = 0;
+    playerChoice = '';
+    computerChoice = '';
+    result = '';
+    gameStarted = false;
+    resultAnimation = 0;
+}
+
+function draw() {
+    background(255);
+    
+    // Draw game title
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    fill(0);
+    text('Rock Paper Scissors', width/2, 40);
+
+    // Draw scores
+    textSize(24);
+    fill(0, 150, 0);
+    text(`Player: ${playerScore}`, width/4, 80);
+    fill(150, 0, 0);
+    text(`Computer: ${computerScore}`, 3*width/4, 80);
+
+    if (gameStarted) {
+        // Draw choices
+        textSize(64);
+        textAlign(CENTER, CENTER);
+        
+        // Player choice
+        if (playerChoice) {
+            text(symbols[playerChoice], width/4, height/2);
+            textSize(20);
+            text('Your Choice', width/4, height/2 + 50);
+        }
+        
+        // Computer choice
+        if (computerChoice) {
+            textSize(64);
+            text(symbols[computerChoice], 3*width/4, height/2);
+            textSize(20);
+            text('Computer\'s Choice', 3*width/4, height/2 + 50);
+        }
+
+        // Draw VS
+        if (playerChoice && computerChoice) {
+            textSize(32);
+            fill(100);
+            text('VS', width/2, height/2);
+        }
+
+        // Draw result with fade animation
+        if (result) {
+            textSize(36);
+            fill(0, resultAnimation);
+            text(result, width/2, height - 80);
+            
+            if (resultAnimation > 0) {
+                resultAnimation = max(0, resultAnimation - 2);
+            }
+        }
+    } else {
+        // Draw instructions
+        textSize(24);
+        fill(100);
+        text('Choose your weapon to start!', width/2, height/2);
+    }
+
+    // Draw decorative elements
+    drawDecoration();
+}
+
+function drawDecoration() {
+    // Draw decorative border
+    noFill();
+    stroke(200);
+    strokeWeight(2);
+    rect(10, 10, width-20, height-20, 10);
+
+    // Draw dividing lines
+    line(width/3, 100, width/3, height-100);
+    line(2*width/3, 100, 2*width/3, height-100);
+
+    // Draw corners
+    let cornerSize = 20;
+    stroke(100);
+    line(0, 0, cornerSize, 0);
+    line(0, 0, 0, cornerSize);
+    line(width-cornerSize, 0, width, 0);
+    line(width, 0, width, cornerSize);
+    line(0, height-cornerSize, 0, height);
+    line(0, height, cornerSize, height);
+    line(width-cornerSize, height, width, height);
+    line(width, height-cornerSize, width, height);
+}
+
+</script>
+</body>
+</html>

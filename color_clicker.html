@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Color Clicker Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #222;
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            margin: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer"></div>
+
+<script>
+let circles = [];
+let targetColor;
+let score = 0;
+let lives = 3;
+let gameStarted = false;
+let gameOver = false;
+let highScore = 0;
+let level = 1;
+let spawnTimer = 0;
+let spawnDelay = 60;
+
+const COLORS = [
+    '#FF0000', // Red
+    '#00FF00', // Green
+    '#0000FF', // Blue
+    '#FFFF00', // Yellow
+    '#FF00FF', // Magenta
+    '#00FFFF'  // Cyan
+];
+
+const COLOR_NAMES = {
+    '#FF0000': 'Red',
+    '#00FF00': 'Green',
+    '#0000FF': 'Blue',
+    '#FFFF00': 'Yellow',
+    '#FF00FF': 'Magenta',
+    '#00FFFF': 'Cyan'
+};
+
+class Circle {
+    constructor() {
+        this.x = random(50, width - 50);
+        this.y = random(50, height - 50);
+        this.size = random(30, 60);
+        this.color = random(COLORS);
+        this.speed = random(1, 2 + level * 0.5);
+        this.direction = random(TWO_PI);
+        this.clicked = false;
+        this.alpha = 255;
+    }
+
+    update() {
+        if (!this.clicked) {
+            this.x += cos(this.direction) * this.speed;
+            this.y += sin(this.direction) * this.speed;
+
+            // Bounce off walls
+            if (this.x < 0 || this.x > width) this.direction = PI - this.direction;
+            if (this.y < 0 || this.y > height) this.direction = -this.direction;
+        } else {
+            this.alpha -= 15;
+            this.size += 2;
+        }
+    }
+
+    show() {
+        noStroke();
+        fill(color(this.color + hex(this.alpha, 2)));
+        circle(this.x, this.y, this.size);
+    }
+
+    contains(px, py) {
+        let d = dist(px, py, this.x, this.y);
+        return d < this.size/2;
+    }
+}
+
+function setup() {
+    let canvas = createCanvas(600, 400);
+    canvas.parent('gameContainer');
+
+    let startButton = createButton('Start Game');
+    startButton.parent('gameContainer');
+    startButton.mousePressed(startGame);
+
+    textAlign(CENTER, CENTER);
+}
+
+function startGame() {
+    circles = [];
+    score = 0;
+    lives = 3;
+    level = 1;
+    gameStarted = true;
+    gameOver = false;
+    spawnTimer = 0;
+    selectNewTargetColor();
+}
+
+function selectNewTargetColor() {
+    targetColor = random(COLORS);
+}
+
+function draw() {
+    background('#222');
+
+    if (gameStarted && !gameOver) {
+        // Spawn new circles
+        spawnTimer++;
+        if (spawnTimer >= spawnDelay) {
+            circles.push(new Circle());
+            spawnTimer = 0;
+            spawnDelay = max(20, 60 - level * 5); // Circles spawn faster with each level
+        }
+
+        // Update and show circles
+        for (let i = circles.length - 1; i >= 0; i--) {
+            circles[i].update();
+            circles[i].show();
+
+            // Remove faded circles
+            if (circles[i].alpha <= 0) {
+                circles.splice(i, 1);
+            }
+        }
+
+        // Level up every 10 points
+        if (score > 0 && score % 10 === 0) {
+            level = floor(score / 10) + 1;
+        }
+
+        // Draw target color text
+        drawGameInfo();
+    } else if (!gameStarted) {
+        drawStartScreen();
+    } else if (gameOver) {
+        drawGameOverScreen();
+    }
+}
+
+function drawGameInfo() {
+    // Draw score and lives
+    fill(255);
+    textSize(24);
+    text(`Score: ${score}`, width/2, 30);
+    text(`Lives: ${lives}`, width/2, 60);
+    text(`Level: ${level}`, width/2, 90);
+
+    // Draw target color with pulsing effect
+    let pulseSize = sin(frameCount * 0.05) * 5;
+    fill(targetColor);
+    circle(width/2, 140, 40 + pulseSize);
+    fill(255);
+    textSize(20);
+    text(`Click ${COLOR_NAMES[targetColor]}!`, width/2, 180);
+}
+
+function drawStartScreen() {
+    fill(255);
+    textSize(32);
+    text('Color Clicker', width/2, height/3);
+    textSize(20);
+    text('Click matching colors to score points!', width/2, height/2);
+    text('Press Start to begin', width/2, height/1.5);
+}
+
+function drawGameOverScreen() {
+    fill(255);
+    textSize(32);
+    text('Game Over!', width/2, height/3);
+    textSize(24);
+    text(`Final Score: ${score}`, width/2, height/2);
+    text(`High Score: ${highScore}`, width/2, height/1.8);
+    textSize(20);
+    text('Press Start to play again', width/2, height/1.5);
+}
+
+function mousePressed() {
+    if (gameStarted && !gameOver) {
+        let hitTarget = false;
+        
+        for (let circle of circles) {
+            if (!circle.clicked && circle.contains(mouseX, mouseY)) {
+                if (circle.color === targetColor) {
+                    // Correct color clicked
+                    circle.clicked = true;
+                    score++;
+                    hitTarget = true;
+                    if (score > highScore) highScore = score;
+                    selectNewTargetColor();
+                } else {
+                    // Wrong color clicked
+                    lives--;
+                    if (lives <= 0) {
+                        gameOver = true;
+                    }
+                }
+                break;
+            }
+        }
+
+        // Missed click (didn't hit any circle)
+        if (!hitTarget) {
+            lives--;
+            if (lives <= 0) {
+                gameOver = true;
+            }
+        }
+    }
+}
+
+</script>
+</body>
+</html>

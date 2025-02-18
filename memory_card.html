@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Memory Card Match Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        #buttonContainer {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            background: white;
+            border: 2px solid black;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <!-- Canvas will be inserted here -->
+    <div id="buttonContainer">
+        <!-- Buttons will be inserted here -->
+    </div>
+</div>
+
+<script>
+let cards = [];
+let flippedCards = [];
+let matchedPairs = 0;
+let moves = 0;
+let gameStarted = false;
+let gameOver = false;
+let timer = 0;
+let startTime;
+
+// Card symbols (using letters for simplicity)
+const symbols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+const GRID_SIZE = 4; // 4x4 grid
+const CARD_SIZE = 80;
+const CARD_SPACING = 20;
+const FLIP_ANIMATION_SPEED = 10;
+
+class Card {
+    constructor(x, y, symbol) {
+        this.x = x;
+        this.y = y;
+        this.symbol = symbol;
+        this.isFlipped = false;
+        this.isMatched = false;
+        this.flipProgress = 0;
+    }
+
+    show() {
+        push();
+        translate(this.x + CARD_SIZE/2, this.y + CARD_SIZE/2);
+        
+        if (this.flipProgress > 0) {
+            scale(cos(this.flipProgress * PI));
+        }
+
+        // Draw card
+        rectMode(CENTER);
+        strokeWeight(2);
+        stroke(0);
+        
+        if (this.isFlipped || this.isMatched) {
+            // Front of card
+            fill(255);
+            rect(0, 0, CARD_SIZE, CARD_SIZE, 10);
+            
+            // Symbol
+            fill(0);
+            noStroke();
+            textAlign(CENTER, CENTER);
+            textSize(32);
+            text(this.symbol, 0, 0);
+        } else {
+            // Back of card
+            fill(200);
+            rect(0, 0, CARD_SIZE, CARD_SIZE, 10);
+            
+            // Card pattern
+            stroke(150);
+            line(-20, -20, 20, 20);
+            line(-20, 20, 20, -20);
+        }
+        pop();
+    }
+
+    contains(px, py) {
+        return px > this.x && px < this.x + CARD_SIZE &&
+               py > this.y && py < this.y + CARD_SIZE;
+    }
+
+    flip() {
+        if (!this.isMatched && !this.isFlipped) {
+            this.isFlipped = true;
+            this.flipProgress = 1;
+        }
+    }
+
+    unflip() {
+        this.isFlipped = false;
+        this.flipProgress = 1;
+    }
+
+    update() {
+        if (this.flipProgress > 0) {
+            this.flipProgress = max(0, this.flipProgress - 0.1);
+        }
+    }
+}
+
+function setup() {
+    let canvas = createCanvas(
+        GRID_SIZE * (CARD_SIZE + CARD_SPACING) + CARD_SPACING,
+        GRID_SIZE * (CARD_SIZE + CARD_SPACING) + CARD_SPACING + 60
+    );
+    canvas.parent('gameContainer');
+
+    let startButton = createButton('New Game');
+    startButton.parent('buttonContainer');
+    startButton.mousePressed(startNewGame);
+
+    startNewGame();
+}
+
+function startNewGame() {
+    // Reset game state
+    cards = [];
+    flippedCards = [];
+    matchedPairs = 0;
+    moves = 0;
+    gameStarted = true;
+    gameOver = false;
+    startTime = millis();
+
+    // Create and shuffle cards
+    let allSymbols = [...symbols, ...symbols];
+    allSymbols = shuffle(allSymbols);
+
+    // Create card grid
+    let index = 0;
+    for (let row = 0; row < GRID_SIZE; row++) {
+        for (let col = 0; col < GRID_SIZE; col++) {
+            let x = col * (CARD_SIZE + CARD_SPACING) + CARD_SPACING;
+            let y = row * (CARD_SIZE + CARD_SPACING) + CARD_SPACING;
+            cards.push(new Card(x, y, allSymbols[index]));
+            index++;
+        }
+    }
+}
+
+function formatTime(ms) {
+    let seconds = floor(ms / 1000);
+    let minutes = floor(seconds / 60);
+    seconds = seconds % 60;
+    return `${nf(minutes, 2)}:${nf(seconds, 2)}`;
+}
+
+function draw() {
+    background(255);
+
+    // Update and draw cards
+    for (let card of cards) {
+        card.update();
+        card.show();
+    }
+
+    // Draw game stats
+    fill(0);
+    noStroke();
+    textSize(20);
+    textAlign(LEFT);
+    text(`Moves: ${moves}`, 20, height - 20);
+    
+    if (gameStarted && !gameOver) {
+        timer = millis() - startTime;
+    }
+    text(`Time: ${formatTime(timer)}`, width - 150, height - 20);
+
+    // Draw game over message
+    if (gameOver) {
+        textAlign(CENTER);
+        textSize(32);
+        text('Congratulations!', width/2, height - 30);
+    }
+}
+
+function mousePressed() {
+    if (!gameStarted || gameOver) return;
+
+    for (let card of cards) {
+        if (card.contains(mouseX, mouseY) && !card.isFlipped && !card.isMatched) {
+            if (flippedCards.length < 2) {
+                card.flip();
+                flippedCards.push(card);
+
+                if (flippedCards.length === 2) {
+                    moves++;
+                    // Check for match
+                    if (flippedCards[0].symbol === flippedCards[1].symbol) {
+                        flippedCards[0].isMatched = true;
+                        flippedCards[1].isMatched = true;
+                        matchedPairs++;
+                        flippedCards = [];
+
+                        // Check for game completion
+                        if (matchedPairs === symbols.length) {
+                            gameOver = true;
+                        }
+                    } else {
+                        // No match - flip cards back after delay
+                        setTimeout(() => {
+                            flippedCards[0].unflip();
+                            flippedCards[1].unflip();
+                            flippedCards = [];
+                        }, 1000);
+                    }
+                }
+            }
+            break;
+        }
+    }
+}
+</script>
+</body>
+</html>

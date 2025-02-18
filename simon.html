@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simon Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #333;
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            margin: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer"></div>
+
+<script>
+let sequence = [];
+let playerSequence = [];
+let gameStarted = false;
+let showingSequence = false;
+let currentStep = 0;
+let score = 0;
+let highScore = 0;
+
+const COLORS = {
+    GREEN: '#00ff00',
+    RED: '#ff0000',
+    YELLOW: '#ffff00',
+    BLUE: '#0000ff'
+};
+
+const DIM_COLORS = {
+    GREEN: '#004400',
+    RED: '#440000',
+    YELLOW: '#444400',
+    BLUE: '#000044'
+};
+
+let buttons = [];
+let startButton;
+
+function setup() {
+    let canvas = createCanvas(500, 500);
+    canvas.parent('gameContainer');
+
+    startButton = createButton('Start Game');
+    startButton.parent('gameContainer');
+    startButton.mousePressed(startGame);
+
+    // Create the four colored buttons
+    const buttonSize = 150;
+    const padding = 100;
+    buttons = [
+        { x: padding, y: padding, color: COLORS.GREEN, dimColor: DIM_COLORS.GREEN, size: buttonSize, isLit: false },
+        { x: padding + buttonSize, y: padding, color: COLORS.RED, dimColor: DIM_COLORS.RED, size: buttonSize, isLit: false },
+        { x: padding, y: padding + buttonSize, color: COLORS.YELLOW, dimColor: DIM_COLORS.YELLOW, size: buttonSize, isLit: false },
+        { x: padding + buttonSize, y: padding + buttonSize, color: COLORS.BLUE, dimColor: DIM_COLORS.BLUE, size: buttonSize, isLit: false }
+    ];
+}
+
+function startGame() {
+    sequence = [];
+    playerSequence = [];
+    gameStarted = true;
+    showingSequence = false;
+    currentStep = 0;
+    score = 0;
+    addToSequence();
+}
+
+function addToSequence() {
+    sequence.push(floor(random(4)));
+    showingSequence = true;
+    currentStep = 0;
+    setTimeout(showSequence, 1000);
+}
+
+function showSequence() {
+    if (currentStep < sequence.length) {
+        // Light up current button
+        buttons[sequence[currentStep]].isLit = true;
+        
+        // Turn off after delay
+        setTimeout(() => {
+            buttons[sequence[currentStep]].isLit = false;
+            currentStep++;
+            setTimeout(showSequence, 300);
+        }, 500);
+    } else {
+        showingSequence = false;
+        playerSequence = [];
+        currentStep = 0;
+    }
+}
+
+function draw() {
+    background('#333');
+
+    // Draw center circle
+    fill(50);
+    stroke(0);
+    strokeWeight(3);
+    circle(width/2, height/2, 100);
+
+    // Draw buttons
+    buttons.forEach(button => {
+        fill(button.isLit ? button.color : button.dimColor);
+        stroke(0);
+        strokeWeight(2);
+        rect(button.x, button.y, button.size, button.size, 20);
+    });
+
+    // Draw score
+    fill(255);
+    noStroke();
+    textAlign(CENTER);
+    textSize(24);
+    text(`Score: ${score}`, width/2, height/2 - 10);
+    text(`High Score: ${highScore}`, width/2, height/2 + 20);
+
+    if (!gameStarted) {
+        fill(0, 0, 0, 150);
+        rect(0, 0, width, height);
+        fill(255);
+        textSize(32);
+        text('Press Start to Play!', width/2, height/2);
+    }
+}
+
+function mousePressed() {
+    if (gameStarted && !showingSequence) {
+        buttons.forEach((button, index) => {
+            if (mouseX > button.x && mouseX < button.x + button.size &&
+                mouseY > button.y && mouseY < button.y + button.size) {
+                // Light up button
+                button.isLit = true;
+                setTimeout(() => button.isLit = false, 300);
+                
+                playerSequence.push(index);
+                checkSequence();
+            }
+        });
+    }
+}
+
+function checkSequence() {
+    let currentIndex = playerSequence.length - 1;
+    
+    if (playerSequence[currentIndex] !== sequence[currentIndex]) {
+        gameOver();
+    } else if (playerSequence.length === sequence.length) {
+        score++;
+        highScore = max(score, highScore);
+        playerSequence = [];
+        setTimeout(addToSequence, 1000);
+    }
+}
+
+function gameOver() {
+    gameStarted = false;
+    showingSequence = false;
+    
+    // Flash all buttons
+    buttons.forEach(button => button.isLit = true);
+    setTimeout(() => {
+        buttons.forEach(button => button.isLit = false);
+    }, 500);
+}
+</script>
+</body>
+</html>

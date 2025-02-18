@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Whack-a-Mole</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #4a8505;
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #8B4513;
+            color: white;
+            margin: 10px;
+        }
+        button:hover {
+            background: #6B3410;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer"></div>
+
+<script>
+let holes = [];
+let score = 0;
+let timeLeft = 30;
+let gameStarted = false;
+let gameOver = false;
+let startTime;
+let highScore = 0;
+
+const GRID_SIZE = 3;
+const HOLE_SIZE = 80;
+const GAME_DURATION = 30;
+
+class Hole {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.hasMole = false;
+        this.moleUp = 0;
+        this.moleHit = false;
+    }
+
+    show() {
+        // Draw hole
+        fill(40);
+        ellipse(this.x, this.y, HOLE_SIZE, HOLE_SIZE * 0.3);
+
+        if (this.hasMole && !this.moleHit) {
+            // Draw mole
+            fill(139, 69, 19);
+            let moleHeight = map(this.moleUp, 0, 100, 0, HOLE_SIZE);
+            ellipse(this.x, this.y - moleHeight/2, HOLE_SIZE * 0.8, moleHeight);
+
+            if (this.moleUp > 50) {
+                // Eyes
+                fill(0);
+                ellipse(this.x - 15, this.y - moleHeight * 0.8, 10, 10);
+                ellipse(this.x + 15, this.y - moleHeight * 0.8, 10, 10);
+                
+                // Nose
+                fill(255, 150, 150);
+                ellipse(this.x, this.y - moleHeight * 0.6, 15, 10);
+            }
+        }
+    }
+
+    update() {
+        if (this.hasMole && !this.moleHit) {
+            this.moleUp = min(100, this.moleUp + 5);
+            if (this.moleUp >= 100) {
+                setTimeout(() => this.hide(), 1000);
+            }
+        }
+    }
+
+    hit(px, py) {
+        if (this.hasMole && !this.moleHit && this.moleUp > 50) {
+            let d = dist(px, py, this.x, this.y - HOLE_SIZE/2);
+            if (d < HOLE_SIZE/2) {
+                this.moleHit = true;
+                score++;
+                setTimeout(() => this.hide(), 500);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    hide() {
+        this.hasMole = false;
+        this.moleUp = 0;
+        this.moleHit = false;
+    }
+
+    popUp() {
+        this.hasMole = true;
+        this.moleUp = 0;
+        this.moleHit = false;
+    }
+}
+
+function setup() {
+    let canvas = createCanvas(600, 500);
+    canvas.parent('gameContainer');
+
+    let startButton = createButton('Start Game');
+    startButton.parent('gameContainer');
+    startButton.mousePressed(startGame);
+
+    // Create holes in a grid
+    let spacing = width / (GRID_SIZE + 1);
+    for (let i = 0; i < GRID_SIZE; i++) {
+        for (let j = 0; j < GRID_SIZE; j++) {
+            holes.push(new Hole(
+                spacing * (j + 1),
+                spacing * (i + 1)
+            ));
+        }
+    }
+}
+
+function startGame() {
+    gameStarted = true;
+    gameOver = false;
+    score = 0;
+    timeLeft = GAME_DURATION;
+    startTime = millis();
+    holes.forEach(hole => hole.hide());
+}
+
+function draw() {
+    background('#90EE90');
+
+    // Draw ground
+    fill('#8B4513');
+    rect(0, height - 50, width, 50);
+
+    // Update and draw holes
+    holes.forEach(hole => {
+        hole.update();
+        hole.show();
+    });
+
+    if (gameStarted && !gameOver) {
+        // Update time
+        timeLeft = max(0, GAME_DURATION - floor((millis() - startTime) / 1000));
+        
+        // Randomly pop up moles
+        if (frameCount % 60 === 0 && random() < 0.5) {
+            let availableHoles = holes.filter(h => !h.hasMole);
+            if (availableHoles.length > 0) {
+                random(availableHoles).popUp();
+            }
+        }
+
+        if (timeLeft <= 0) {
+            gameOver = true;
+            highScore = max(highScore, score);
+        }
+    }
+
+    // Draw UI
+    fill(0);
+    textSize(24);
+    textAlign(LEFT);
+    text(`Score: ${score}`, 20, 40);
+    text(`Time: ${timeLeft}s`, 20, 70);
+    text(`High Score: ${highScore}`, width - 200, 40);
+
+    if (!gameStarted) {
+        drawStartScreen();
+    } else if (gameOver) {
+        drawGameOverScreen();
+    }
+}
+
+function drawStartScreen() {
+    fill(0, 0, 0, 150);
+    rect(0, 0, width, height);
+    fill(255);
+    textAlign(CENTER);
+    textSize(36);
+    text('Click Start to Play!', width/2, height/2);
+}
+
+function drawGameOverScreen() {
+    fill(0, 0, 0, 150);
+    rect(0, 0, width, height);
+    fill(255);
+    textAlign(CENTER);
+    textSize(36);
+    text('Game Over!', width/2, height/2 - 40);
+    text(`Final Score: ${score}`, width/2, height/2 + 10);
+    textSize(24);
+    text('Click Start to Play Again', width/2, height/2 + 50);
+}
+
+function mousePressed() {
+    if (gameStarted && !gameOver) {
+        holes.forEach(hole => hole.hit(mouseX, mouseY));
+    }
+}
+</script>
+</body>
+</html>

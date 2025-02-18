@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Maze Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #222;
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            margin: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer"></div>
+
+<script>
+let maze = [];
+let cellSize = 40;
+let cols, rows;
+let player;
+let goal;
+let gameStarted = false;
+let gameWon = false;
+let startTime;
+let currentTime;
+let bestTime = Infinity;
+
+class Player {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = cellSize * 0.8;
+    }
+
+    show() {
+        fill('#ff0');
+        noStroke();
+        circle(this.x * cellSize + cellSize/2, 
+               this.y * cellSize + cellSize/2, 
+               this.size);
+    }
+
+    move(dx, dy) {
+        let newX = this.x + dx;
+        let newY = this.y + dy;
+        
+        if (newX >= 0 && newX < cols && 
+            newY >= 0 && newY < rows && 
+            maze[newY][newX] !== 1) {
+            this.x = newX;
+            this.y = newY;
+        }
+    }
+}
+
+function setup() {
+    let canvas = createCanvas(800, 600);
+    canvas.parent('gameContainer');
+
+    let startButton = createButton('Start New Game');
+    startButton.parent('gameContainer');
+    startButton.mousePressed(startGame);
+
+    cols = floor(width / cellSize);
+    rows = floor(height / cellSize);
+    
+    generateMaze();
+}
+
+function generateMaze() {
+    // Initialize maze with walls
+    maze = new Array(rows).fill().map(() => new Array(cols).fill(1));
+    
+    // Create paths using recursive backtracking
+    function carve(x, y) {
+        maze[y][x] = 0;
+        
+        // Directions: right, down, left, up
+        let dirs = [[0,1], [1,0], [0,-1], [-1,0]];
+        dirs = shuffle(dirs);
+        
+        for (let [dx, dy] of dirs) {
+            let nx = x + dx*2;
+            let ny = y + dy*2;
+            
+            if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && maze[ny][nx] === 1) {
+                maze[y + dy][x + dx] = 0;
+                carve(nx, ny);
+            }
+        }
+    }
+
+    // Start from a random point
+    let startX = floor(random(cols/2)) * 2;
+    let startY = floor(random(rows/2)) * 2;
+    carve(startX, startY);
+
+    // Create entrance and exit
+    maze[1][1] = 0; // entrance
+    maze[rows-2][cols-2] = 0; // exit
+    
+    // Place player and goal
+    player = new Player(1, 1);
+    goal = {x: cols-2, y: rows-2};
+}
+
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        let j = floor(random(i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+function startGame() {
+    generateMaze();
+    gameStarted = true;
+    gameWon = false;
+    startTime = millis();
+}
+
+function draw() {
+    background('#222');
+    
+    if (gameStarted) {
+        // Draw maze
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                if (maze[y][x] === 1) {
+                    fill('#444');
+                    stroke('#333');
+                    rect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        // Draw goal
+        fill('#0f0');
+        noStroke();
+        circle(goal.x * cellSize + cellSize/2, 
+               goal.y * cellSize + cellSize/2, 
+               cellSize * 0.8);
+
+        // Draw player
+        player.show();
+
+        // Update and display time
+        if (!gameWon) {
+            currentTime = (millis() - startTime) / 1000;
+        }
+        
+        // Display time and best time
+        fill(255);
+        noStroke();
+        textSize(20);
+        textAlign(LEFT);
+        text(`Time: ${currentTime.toFixed(1)}s`, 10, 30);
+        if (bestTime < Infinity) {
+            text(`Best Time: ${bestTime.toFixed(1)}s`, 10, 60);
+        }
+
+        // Check for win
+        if (!gameWon && player.x === goal.x && player.y === goal.y) {
+            gameWon = true;
+            if (currentTime < bestTime) {
+                bestTime = currentTime;
+            }
+        }
+
+        // Display win message
+        if (gameWon) {
+            fill(255);
+            textSize(32);
+            textAlign(CENTER);
+            text('You Win!', width/2, height/2);
+            textSize(24);
+            text('Press Start for a new maze', width/2, height/2 + 40);
+        }
+    } else {
+        // Start screen
+        fill(255);
+        textSize(32);
+        textAlign(CENTER);
+        text('Maze Game', width/2, height/2);
+        textSize(24);
+        text('Use arrow keys to move', width/2, height/2 + 40);
+        text('Press Start to begin', width/2, height/2 + 80);
+    }
+}
+
+function keyPressed() {
+    if (gameStarted && !gameWon) {
+        switch(keyCode) {
+            case LEFT_ARROW:
+                player.move(-1, 0);
+                break;
+            case RIGHT_ARROW:
+                player.move(1, 0);
+                break;
+            case UP_ARROW:
+                player.move(0, -1);
+                break;
+            case DOWN_ARROW:
+                player.move(0, 1);
+                break;
+        }
+    }
+}
+</script>
+</body>
+</html>
