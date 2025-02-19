@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>按揭贷款计算器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .calculator-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 400px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .result-amount {
+            color: #e74c3c;
+            font-size: 24px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<div class="calculator-container">
+    <div class="input-group">
+        <label>贷款金额 (元):</label>
+        <input type="number" id="loanAmount" placeholder="例如: 1000000">
+    </div>
+    
+    <div class="input-group">
+        <label>年利率 (%):</label>
+        <input type="number" id="annualRate" placeholder="例如: 4.35" step="0.01">
+    </div>
+    
+    <div class="input-group">
+        <label>贷款年限 (年):</label>
+        <input type="number" id="loanYears" placeholder="例如: 30">
+    </div>
+    
+    <button onclick="calculateMortgage()">计算月供</button>
+    
+    <div class="result" id="result">
+        <p>每月需还款金额：</p>
+        <p class="result-amount" id="monthlyPayment">¥ 0.00</p>
+    </div>
+</div>
+
+<script>
+function calculateMortgage() {
+    // 获取输入值
+    const loanAmount = parseFloat(document.getElementById('loanAmount').value);
+    const annualRate = parseFloat(document.getElementById('annualRate').value) / 100;
+    const years = parseFloat(document.getElementById('loanYears').value);
+    
+    // 验证输入
+    if (isNaN(loanAmount) || isNaN(annualRate) || isNaN(years)) {
+        alert('请输入有效的数字！');
+        return;
+    }
+    
+    // 计算月利率
+    const monthlyRate = annualRate / 12;
+    
+    // 计算还款月数
+    const totalMonths = years * 12;
+    
+    // 计算月供
+    const monthlyPayment = loanAmount * 
+                          (monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / 
+                          (Math.pow(1 + monthlyRate, totalMonths) - 1);
+    
+    // 显示结果
+    document.getElementById('monthlyPayment').textContent = 
+        '¥ ' + monthlyPayment.toFixed(2);
+}
+</script>
+</body>
+</html>

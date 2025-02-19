@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        #pauseButton {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #pauseButton:hover {
+            background: #ddd;
+        }
+    </style>
+</head>
+<body style="margin:0; background:black;">
+<button id="pauseButton">Pause</button>
+<script>
+let angle = 0;
+let isRotating = true;
+const radius = 120;
+const points = [];
+const numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+// Create and setup pause button
+const pauseButton = document.getElementById('pauseButton');
+pauseButton.addEventListener('click', () => {
+    isRotating = !isRotating;
+    pauseButton.textContent = isRotating ? 'Pause' : 'Resume';
+});
+
+function setup() {
+    createCanvas(windowWidth, windowHeight);
+    textAlign(CENTER, CENTER);
+    textSize(12);
+
+    // Generate sphere points
+    for(let lat = 0; lat < 20; lat++) {
+        for(let lon = 0; lon < 20; lon++) {
+            const phi = map(lat, 0, 20, 0, PI);
+            const theta = map(lon, 0, 20, 0, TWO_PI);
+            
+            points.push({
+                x: radius * sin(phi) * cos(theta),
+                y: radius * sin(phi) * sin(theta),
+                z: radius * cos(phi),
+                char: numbers[floor(random(numbers.length))]
+            });
+        }
+    }
+}
+
+function draw() {
+    background(0);
+    translate(width/2, height/2);
+
+    // Sort points by depth for correct rendering
+    let visiblePoints = points.map(p => ({
+        x: p.x * cos(angle) - p.z * sin(angle),
+        y: p.y,
+        z: p.x * sin(angle) + p.z * cos(angle),
+        char: p.char
+    })).sort((a, b) => a.z - b.z);
+
+    // Draw numbers
+    visiblePoints.forEach(p => {
+        // Calculate brightness based on z-position
+        let bright = map(p.z, -radius, radius, 50, 255);
+        fill(bright);
+        noStroke();
+        
+        // Project 3D to 2D
+        let scale = 1.5 / (1 + p.z / 500);
+        let x2d = p.x * scale;
+        let y2d = p.y * scale;
+        
+        text(p.char, x2d, y2d);
+    });
+
+    // Only increment angle if rotation is not paused
+    if (isRotating) {
+        angle += 0.03;
+    }
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>

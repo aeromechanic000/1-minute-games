@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #pauseButton {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+        #pauseButton:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+<button id="pauseButton">Pause</button>
+<script>
+let particles = [];
+let numParticles = 25;
+let cylinderHeight = 300;
+let cylinderRadius = 100;
+let sphereRadius = 200;
+let rotationAngle = 0;
+let zoomFactor = 1;
+let zoomDirection = 1;
+let isPaused = false;
+
+class Particle {
+    constructor() {
+        this.pos = createVector(
+            random(-cylinderRadius/2, cylinderRadius/2),
+            random(-cylinderHeight/2, cylinderHeight/2),
+            random(-cylinderRadius/2, cylinderRadius/2)
+        );
+        this.vel = p5.Vector.random3D().mult(3);
+        this.radius = 5;
+        this.color = color(random(255), random(255), random(255));
+        this.history = [];
+    }
+
+    update() {
+        if (!isPaused) {
+            this.pos.add(this.vel);
+            
+            // Store position history for trail
+            this.history.push(createVector(this.pos.x, this.pos.y, this.pos.z));
+            if (this.history.length > 20) {
+                this.history.shift();
+            }
+
+            // Cylinder collision detection
+            let xz_dist = sqrt(this.pos.x * this.pos.x + this.pos.z * this.pos.z);
+            if (xz_dist > cylinderRadius - this.radius) {
+                let normal = createVector(this.pos.x, 0, this.pos.z);
+                normal.normalize();
+                this.vel.reflect(normal);
+                xz_dist = cylinderRadius - this.radius;
+                let angle = atan2(this.pos.z, this.pos.x);
+                this.pos.x = cos(angle) * xz_dist;
+                this.pos.z = sin(angle) * xz_dist;
+            }
+
+            // Top and bottom collision
+            if (abs(this.pos.y) > cylinderHeight/2 - this.radius) {
+                this.vel.y *= -1;
+                this.pos.y = sign(this.pos.y) * (cylinderHeight/2 - this.radius);
+            }
+
+            // Sphere collision detection
+            let dist = this.pos.mag();
+            if (dist > sphereRadius - this.radius) {
+                let normal = this.pos.copy().normalize();
+                this.vel.reflect(normal);
+                this.pos = normal.mult(sphereRadius - this.radius);
+            }
+        }
+    }
+
+    display() {
+        push();
+        noStroke();
+        fill(this.color);
+        translate(this.pos.x, this.pos.y, this.pos.z);
+        sphere(this.radius);
+        
+        // Draw trail
+        beginShape();
+        noFill();
+        stroke(this.color);
+        for (let i = 0; i < this.history.length; i++) {
+            let pos = this.history[i];
+            vertex(pos.x - this.pos.x, pos.y - this.pos.y, pos.z - this.pos.z);
+        }
+        endShape();
+        pop();
+    }
+}
+
+function setup() {
+    createCanvas(windowWidth, windowHeight, WEBGL);
+    for (let i = 0; i < numParticles; i++) {
+        particles.push(new Particle());
+    }
+
+    // Add event listener for pause button
+    const pauseButton = document.getElementById('pauseButton');
+    pauseButton.addEventListener('click', togglePause);
+}
+
+function togglePause() {
+    isPaused = !isPaused;
+    const pauseButton = document.getElementById('pauseButton');
+    pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+    pauseButton.style.backgroundColor = isPaused ? '#f44336' : '#4CAF50';
+}
+
+function draw() {
+    background(0);
+    
+    // Update zoom
+    if (!isPaused) {
+        zoomFactor += 0.005 * zoomDirection;
+        if (zoomFactor > 1.5 || zoomFactor < 0.5) {
+            zoomDirection *= -1;
+        }
+        
+        rotationAngle += 0.005;
+    }
+    
+    // Camera setup
+    scale(zoomFactor);
+    rotateY(rotationAngle);
+    
+    // Draw outer sphere
+    push();
+    noFill();
+    stroke(100);
+    sphere(sphereRadius);
+    pop();
+    
+    // Draw cylinder
+    push();
+    noFill();
+    stroke(150);
+    drawCylinder(cylinderRadius, cylinderHeight);
+    pop();
+    
+    // Update and display particles
+    for (let particle of particles) {
+        particle.update();
+        particle.display();
+    }
+}
+
+function drawCylinder(radius, height) {
+    let resolution = 30;
+    
+    // Draw top and bottom circles
+    for (let y = -1; y <= 1; y += 2) {
+        beginShape();
+        for (let i = 0; i <= resolution; i++) {
+            let angle = map(i, 0, resolution, 0, TWO_PI);
+            let x = cos(angle) * radius;
+            let z = sin(angle) * radius;
+            vertex(x, y * height/2, z);
+        }
+        endShape(CLOSE);
+    }
+    
+    // Draw vertical lines
+    for (let i = 0; i < resolution; i++) {
+        let angle = map(i, 0, resolution, 0, TWO_PI);
+        let x = cos(angle) * radius;
+        let z = sin(angle) * radius;
+        beginShape();
+        vertex(x, -height/2, z);
+        vertex(x, height/2, z);
+        endShape();
+    }
+}
+
+function sign(x) {
+    return x > 0 ? 1 : -1;
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>
