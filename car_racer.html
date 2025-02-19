@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auto-Racing Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .button-container {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        button {
+            padding: 12px 30px;
+            background: white;
+            border: 2px solid #333;
+            cursor: pointer;
+            font-size: 18px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #eee;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <div class="button-container">
+        <button onclick="startGame()">Start</button>
+        <button onclick="resetGame()">Reset</button>
+    </div>
+
+<script>
+let player1, player2;
+let obstacles = [];
+let gameState = 'initial';
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 600;
+const TRACK_LENGTH = 5000;
+const OBSTACLE_SPACING = 250;
+const GAME_SPEED = 5;
+
+class Car {
+    constructor(x, color, controls) {
+        this.x = x;
+        this.y = CANVAS_HEIGHT - 100;
+        this.width = 30;
+        this.height = 50;
+        this.speed = GAME_SPEED;
+        this.lateralSpeed = 4;
+        this.color = color;
+        this.controls = controls;
+        this.distance = 0;
+        this.alive = true;
+        this.score = 0;
+        // Smaller hitbox than visual size
+        this.hitboxWidth = this.width * 0.6;
+        this.hitboxHeight = this.height * 0.6;
+    }
+
+    update() {
+        if (!this.alive) return;
+
+        if (keyIsDown(this.controls.left)) {
+            this.x = max(this.width, this.x - this.lateralSpeed);
+        }
+        if (keyIsDown(this.controls.right)) {
+            this.x = min(CANVAS_WIDTH/2 - this.width, this.x + this.lateralSpeed);
+        }
+
+        this.distance += this.speed;
+        this.score = floor(this.distance / 10);
+    }
+
+    draw(offsetX = 0) {
+        if (!this.alive) return;
+        
+        push();
+        translate(this.x + offsetX, this.y);
+        
+        // Car body
+        fill(this.color);
+        stroke(0);
+        strokeWeight(2);
+        rectMode(CENTER);
+        rect(0, 0, this.width, this.height);
+        
+        // Car details
+        fill(0);
+        // Windows
+        rect(0, -this.height/4, this.width * 0.8, this.height/4);
+        
+        // Wheels
+        fill(0);
+        rect(-this.width/2 - 2, -this.height/3, 4, 8);
+        rect(this.width/2 + 2, -this.height/3, 4, 8);
+        rect(-this.width/2 - 2, this.height/3, 4, 8);
+        rect(this.width/2 + 2, this.height/3, 4, 8);
+        
+        pop();
+    }
+
+    checkCollision(obstacles) {
+        if (!this.alive) return false;
+        
+        for (let obs of obstacles) {
+            let relativeY = this.y - (obs.y - this.distance);
+            
+            // Only check collision if obstacle is near the car
+            if (relativeY > -this.height && relativeY < this.height) {
+                let dx = Math.abs(this.x - obs.x);
+                let dy = Math.abs(relativeY);
+                
+                // Draw hitbox for debugging (comment out in production)
+                // stroke(255, 0, 0);
+                // noFill();
+                // rect(this.x, this.y, this.hitboxWidth, this.hitboxHeight);
+                
+                if (dx < (this.hitboxWidth/2 + obs.size/3) && 
+                    dy < (this.hitboxHeight/2 + obs.size/3)) {
+                    this.alive = false;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}
+
+class Obstacle {
+    constructor(x, y, size) {
+        this.x = constrain(x, size + 20, CANVAS_WIDTH/2 - size - 20);
+        this.y = y;
+        this.size = size;
+    }
+
+    draw(offsetX, playerDistance) {
+        let screenY = CANVAS_HEIGHT - (this.y - playerDistance);
+        if (screenY > -50 && screenY < CANVAS_HEIGHT + 50) {
+            fill(80);
+            stroke(0);
+            strokeWeight(2);
+            circle(this.x + offsetX, screenY, this.size);
+        }
+    }
+}
+
+function generateObstacles() {
+    obstacles = [];
+    let lastX = CANVAS_WIDTH/4;
+    
+    for (let y = 400; y < TRACK_LENGTH; y += OBSTACLE_SPACING) {
+        // Create a more interesting pattern
+        let newX;
+        if (random() < 0.5) {
+            newX = random(50, CANVAS_WIDTH/4 - 30); // Left side
+        } else {
+            newX = random(CANVAS_WIDTH/4 + 30, CANVAS_WIDTH/2 - 50); // Right side
+        }
+        
+        obstacles.push(new Obstacle(
+            newX,
+            y,
+            30 // Fixed size for more consistent hitboxes
+        ));
+    }
+}
+
+function setup() {
+    createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+    resetGame();
+}
+
+function startGame() {
+    if (gameState === 'initial' || gameState === 'finished') {
+        resetGame();
+        gameState = 'playing';
+    }
+}
+
+function resetGame() {
+    player1 = new Car(CANVAS_WIDTH/4, '#ff0000', {
+        left: 65,  // A
+        right: 68  // D
+    });
+
+    player2 = new Car(CANVAS_WIDTH/4, '#0000ff', {
+        left: LEFT_ARROW,
+        right: RIGHT_ARROW
+    });
+
+    generateObstacles();
+    gameState = 'initial';
+}
+
+function drawTrack(offsetX, player) {
+    // Track background
+    fill(150);
+    noStroke();
+    rect(offsetX, 0, CANVAS_WIDTH/2, CANVAS_HEIGHT);
+    
+    // Road lines
+    stroke(255);
+    strokeWeight(3);
+    let lineSpacing = 40;
+    let lineOffset = (player.distance % lineSpacing);
+    for (let y = CANVAS_HEIGHT + lineOffset; y > -lineSpacing; y -= lineSpacing) {
+        line(offsetX + CANVAS_WIDTH/4, y, offsetX + CANVAS_WIDTH/4, y - 20);
+    }
+
+    // Draw obstacles
+    for (let obs of obstacles) {
+        obs.draw(offsetX, player.distance);
+    }
+
+    // Draw player
+    player.draw(offsetX);
+}
+
+function drawUI() {
+    fill(0);
+    noStroke();
+    textSize(20);
+    textAlign(LEFT);
+
+    // Player 1 info
+    fill(player1.color);
+    text(`Player 1 Score: ${player1.score}`, 10, 30);
+    if (!player1.alive) text("CRASHED!", 10, 60);
+
+    // Player 2 info
+    fill(player2.color);
+    text(`Player 2 Score: ${player2.score}`, CANVAS_WIDTH/2 + 10, 30);
+    if (!player2.alive) text("CRASHED!", CANVAS_WIDTH/2 + 10, 60);
+
+    if (gameState === 'initial') {
+        fill(0);
+        textAlign(CENTER);
+        textSize(40);
+        text("Press Start to Begin!", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+        textSize(20);
+        text("Player 1: A/D keys", CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 40);
+        text("Player 2: Left/Right arrows", CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 70);
+    }
+
+    if (gameState === 'finished') {
+        fill(0);
+        textAlign(CENTER);
+        textSize(40);
+        text("RACE FINISHED!", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+        let winner = player1.score > player2.score ? "Player 1" : "Player 2";
+        text(`${winner} Wins!`, CANVAS_WIDTH/2, CANVAS_HEIGHT/2 + 50);
+    }
+}
+
+function draw() {
+    background(220);
+
+    // Split screen divider
+    stroke(0);
+    strokeWeight(4);
+    line(CANVAS_WIDTH/2, 0, CANVAS_WIDTH/2, CANVAS_HEIGHT);
+
+    if (gameState === 'playing') {
+        player1.update();
+        player2.update();
+
+        player1.checkCollision(obstacles);
+        player2.checkCollision(obstacles);
+
+        if (player1.distance >= TRACK_LENGTH || 
+            player2.distance >= TRACK_LENGTH || 
+            (!player1.alive && !player2.alive)) {
+            gameState = 'finished';
+        }
+    }
+
+    drawTrack(0, player1);
+    drawTrack(CANVAS_WIDTH/2, player2);
+    drawUI();
+}
+</script>
+</body>
+</html>
