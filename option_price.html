@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Option Pricing Calculator</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        .calculator-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 400px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .result-amount {
+            color: #e74c3c;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<div class="calculator-container">
+    <div class="input-group">
+        <label>Option Type:</label>
+        <select id="optionType">
+            <option value="call">Call Option</option>
+            <option value="put">Put Option</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>Option Style:</label>
+        <select id="optionStyle">
+            <option value="european">European Option</option>
+            <option value="american">American Option</option>
+        </select>
+        <div class="note">Note: American options are calculated using Binomial Tree Model</div>
+    </div>
+
+    <div class="input-group">
+        <label>Stock Price (S):</label>
+        <input type="number" id="stockPrice" placeholder="Example: 100" step="0.01">
+    </div>
+    
+    <div class="input-group">
+        <label>Strike Price (K):</label>
+        <input type="number" id="strikePrice" placeholder="Example: 100" step="0.01">
+    </div>
+    
+    <div class="input-group">
+        <label>Time to Maturity (T) in Years:</label>
+        <input type="number" id="timeToMaturity" placeholder="Example: 1" step="0.01">
+    </div>
+
+    <div class="input-group">
+        <label>Risk-free Rate (r) %:</label>
+        <input type="number" id="riskFreeRate" placeholder="Example: 5" step="0.01">
+    </div>
+
+    <div class="input-group">
+        <label>Volatility (σ) %:</label>
+        <input type="number" id="volatility" placeholder="Example: 20" step="0.01">
+    </div>
+    
+    <button onclick="calculateOption()">Calculate Option Price</button>
+    
+    <div class="result">
+        <p>Option Price:</p>
+        <p class="result-amount" id="optionPrice">$ 0.00</p>
+    </div>
+</div>
+
+<script>
+function normalCDF(x) {
+    let t = 1 / (1 + 0.2316419 * Math.abs(x));
+    let d = 0.3989423 * Math.exp(-x * x / 2);
+    let probability = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    if (x > 0) probability = 1 - probability;
+    return probability;
+}
+
+function calculateD1(S, K, r, v, T) {
+    return (Math.log(S / K) + (r + v * v / 2) * T) / (v * Math.sqrt(T));
+}
+
+function calculateD2(d1, v, T) {
+    return d1 - v * Math.sqrt(T);
+}
+
+function calculateEuropeanOption(S, K, T, r, v, type) {
+    const d1 = calculateD1(S, K, r, v, T);
+    const d2 = calculateD2(d1, v, T);
+
+    if (type === 'call') {
+        return S * normalCDF(d1) - K * Math.exp(-r * T) * normalCDF(d2);
+    } else {
+        return K * Math.exp(-r * T) * normalCDF(-d2) - S * normalCDF(-d1);
+    }
+}
+
+function calculateAmericanOption(S, K, T, r, v, type) {
+    // Using Binomial Tree Model for American Options
+    const steps = 50; // Number of steps
+    const dt = T / steps;
+    const u = Math.exp(v * Math.sqrt(dt));
+    const d = 1 / u;
+    const p = (Math.exp(r * dt) - d) / (u - d);
+
+    // Create stock price tree and option value tree
+    let stockTree = Array(steps + 1).fill().map(() => Array(steps + 1).fill(0));
+    let optionTree = Array(steps + 1).fill().map(() => Array(steps + 1).fill(0));
+
+    // Build stock price tree
+    for (let i = 0; i <= steps; i++) {
+        for (let j = 0; j <= i; j++) {
+            stockTree[i][j] = S * Math.pow(u, j) * Math.pow(d, i - j);
+        }
+    }
+
+    // Calculate option values at expiration
+    for (let j = 0; j <= steps; j++) {
+        if (type === 'call') {
+            optionTree[steps][j] = Math.max(0, stockTree[steps][j] - K);
+        } else {
+            optionTree[steps][j] = Math.max(0, K - stockTree[steps][j]);
+        }
+    }
+
+    // Backward induction for option values
+    for (let i = steps - 1; i >= 0; i--) {
+        for (let j = 0; j <= i; j++) {
+            let holdValue = Math.exp(-r * dt) * (p * optionTree[i + 1][j + 1] + (1 - p) * optionTree[i + 1][j]);
+            let exerciseValue = type === 'call' ? 
+                Math.max(0, stockTree[i][j] - K) : 
+                Math.max(0, K - stockTree[i][j]);
+            optionTree[i][j] = Math.max(holdValue, exerciseValue);
+        }
+    }
+
+    return optionTree[0][0];
+}
+
+function calculateOption() {
+    const optionType = document.getElementById('optionType').value;
+    const optionStyle = document.getElementById('optionStyle').value;
+    const S = parseFloat(document.getElementById('stockPrice').value);
+    const K = parseFloat(document.getElementById('strikePrice').value);
+    const T = parseFloat(document.getElementById('timeToMaturity').value);
+    const r = parseFloat(document.getElementById('riskFreeRate').value) / 100;
+    const v = parseFloat(document.getElementById('volatility').value) / 100;
+
+    if ([S, K, T, r, v].some(isNaN)) {
+        alert('Please enter valid numbers for all fields!');
+        return;
+    }
+
+    let optionPrice;
+    if (optionStyle === 'european') {
+        optionPrice = calculateEuropeanOption(S, K, T, r, v, optionType);
+    } else {
+        optionPrice = calculateAmericanOption(S, K, T, r, v, optionType);
+    }
+
+    document.getElementById('optionPrice').textContent = 
+        '$ ' + optionPrice.toFixed(2);
+}
+</script>
+</body>
+</html>

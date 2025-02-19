@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>期权定价计算器</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .calculator-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 400px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .result-amount {
+            color: #e74c3c;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<div class="calculator-container">
+    <div class="input-group">
+        <label>期权类型:</label>
+        <select id="optionType">
+            <option value="call">看涨期权 (Call)</option>
+            <option value="put">看跌期权 (Put)</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>期权风格:</label>
+        <select id="optionStyle">
+            <option value="european">欧式期权</option>
+            <option value="american">美式期权</option>
+        </select>
+        <div class="note">注：美式期权价格使用二叉树模型近似计算</div>
+    </div>
+
+    <div class="input-group">
+        <label>标的价格 (S):</label>
+        <input type="number" id="stockPrice" placeholder="例如: 100" step="0.01">
+    </div>
+    
+    <div class="input-group">
+        <label>执行价格 (K):</label>
+        <input type="number" id="strikePrice" placeholder="例如: 100" step="0.01">
+    </div>
+    
+    <div class="input-group">
+        <label>到期时间 (T) 年:</label>
+        <input type="number" id="timeToMaturity" placeholder="例如: 1" step="0.01">
+    </div>
+
+    <div class="input-group">
+        <label>无风险利率 (r) %:</label>
+        <input type="number" id="riskFreeRate" placeholder="例如: 5" step="0.01">
+    </div>
+
+    <div class="input-group">
+        <label>波动率 (σ) %:</label>
+        <input type="number" id="volatility" placeholder="例如: 20" step="0.01">
+    </div>
+    
+    <button onclick="calculateOption()">计算期权价格</button>
+    
+    <div class="result">
+        <p>期权理论价格:</p>
+        <p class="result-amount" id="optionPrice">￥ 0.00</p>
+    </div>
+</div>
+
+<script>
+function normalCDF(x) {
+    let t = 1 / (1 + 0.2316419 * Math.abs(x));
+    let d = 0.3989423 * Math.exp(-x * x / 2);
+    let probability = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    if (x > 0) probability = 1 - probability;
+    return probability;
+}
+
+function calculateD1(S, K, r, v, T) {
+    return (Math.log(S / K) + (r + v * v / 2) * T) / (v * Math.sqrt(T));
+}
+
+function calculateD2(d1, v, T) {
+    return d1 - v * Math.sqrt(T);
+}
+
+function calculateEuropeanOption(S, K, T, r, v, type) {
+    const d1 = calculateD1(S, K, r, v, T);
+    const d2 = calculateD2(d1, v, T);
+
+    if (type === 'call') {
+        return S * normalCDF(d1) - K * Math.exp(-r * T) * normalCDF(d2);
+    } else {
+        return K * Math.exp(-r * T) * normalCDF(-d2) - S * normalCDF(-d1);
+    }
+}
+
+function calculateAmericanOption(S, K, T, r, v, type) {
+    // 使用二叉树模型计算美式期权
+    const steps = 50; // 二叉树步数
+    const dt = T / steps;
+    const u = Math.exp(v * Math.sqrt(dt));
+    const d = 1 / u;
+    const p = (Math.exp(r * dt) - d) / (u - d);
+
+    // 创建价格树和期权价值树
+    let stockTree = Array(steps + 1).fill().map(() => Array(steps + 1).fill(0));
+    let optionTree = Array(steps + 1).fill().map(() => Array(steps + 1).fill(0));
+
+    // 构建价格树
+    for (let i = 0; i <= steps; i++) {
+        for (let j = 0; j <= i; j++) {
+            stockTree[i][j] = S * Math.pow(u, j) * Math.pow(d, i - j);
+        }
+    }
+
+    // 在到期时计算期权价值
+    for (let j = 0; j <= steps; j++) {
+        if (type === 'call') {
+            optionTree[steps][j] = Math.max(0, stockTree[steps][j] - K);
+        } else {
+            optionTree[steps][j] = Math.max(0, K - stockTree[steps][j]);
+        }
+    }
+
+    // 向后递推计算期权价值
+    for (let i = steps - 1; i >= 0; i--) {
+        for (let j = 0; j <= i; j++) {
+            let holdValue = Math.exp(-r * dt) * (p * optionTree[i + 1][j + 1] + (1 - p) * optionTree[i + 1][j]);
+            let exerciseValue = type === 'call' ? 
+                Math.max(0, stockTree[i][j] - K) : 
+                Math.max(0, K - stockTree[i][j]);
+            optionTree[i][j] = Math.max(holdValue, exerciseValue);
+        }
+    }
+
+    return optionTree[0][0];
+}
+
+function calculateOption() {
+    const optionType = document.getElementById('optionType').value;
+    const optionStyle = document.getElementById('optionStyle').value;
+    const S = parseFloat(document.getElementById('stockPrice').value);
+    const K = parseFloat(document.getElementById('strikePrice').value);
+    const T = parseFloat(document.getElementById('timeToMaturity').value);
+    const r = parseFloat(document.getElementById('riskFreeRate').value) / 100;
+    const v = parseFloat(document.getElementById('volatility').value) / 100;
+
+    if ([S, K, T, r, v].some(isNaN)) {
+        alert('请为所有字段输入有效数字！');
+        return;
+    }
+
+    let optionPrice;
+    if (optionStyle === 'european') {
+        optionPrice = calculateEuropeanOption(S, K, T, r, v, optionType);
+    } else {
+        optionPrice = calculateAmericanOption(S, K, T, r, v, optionType);
+    }
+
+    document.getElementById('optionPrice').textContent = 
+        '￥ ' + optionPrice.toFixed(2);
+}
+</script>
+</body>
+</html>
