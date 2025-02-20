@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cyberpunk Solar System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        .controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+<div class="controls">
+    <label>Orbit Speed: <input type="range" id="orbitSpeed" min="1" max="200" value="100"></label>
+    <label><input type="checkbox" id="showOrbits" checked> Show Orbits</label>
+</div>
+<script>
+let planets = [];
+let camRotX = 0;
+let camRotY = 0;
+let zoom = 1;
+
+const ORBIT_COLOR = '#FFFFFF';
+const SUN_SIZE = 40;
+
+class Planet {
+    constructor(name, distance, size, color, orbitSpeed, tilt = 0) {
+        this.name = name;
+        this.distance = distance;
+        this.size = size;
+        this.color = color;
+        this.orbitSpeed = orbitSpeed;
+        this.angle = random(TWO_PI);
+        this.tilt = tilt;
+        this.orbitPoints = [];
+        this.generateOrbitPoints();
+    }
+
+    generateOrbitPoints() {
+        for (let angle = 0; angle < TWO_PI; angle += 0.1) {
+            this.orbitPoints.push({
+                x: this.distance * cos(angle),
+                z: this.distance * sin(angle)
+            });
+        }
+    }
+
+    update(speedMultiplier) {
+        this.angle += (this.orbitSpeed * speedMultiplier) / 1000;
+    }
+
+    displayOrbit() {
+        push();
+        noFill();
+        stroke(ORBIT_COLOR);
+        strokeWeight(2);
+        beginShape();
+        for (let point of this.orbitPoints) {
+            vertex(point.x, 0, point.z);
+        }
+        endShape(CLOSE);
+        pop();
+    }
+
+    display() {
+        push();
+        rotateY(this.angle);
+        translate(this.distance, 0, 0);
+        
+        // Completely solid planet
+        noStroke();
+        specularMaterial(this.color);
+        ambientMaterial(this.color);
+        
+        push();
+        rotateX(this.tilt);
+        sphere(this.size);
+        pop();
+        
+        pop();
+    }
+}
+
+function setup() {
+    createCanvas(windowWidth, windowHeight, WEBGL);
+    
+    planets = [
+        new Planet("MERCURY", 100, 3.8, '#FF00FF', 4.7, 0.034),    // Pure Magenta
+        new Planet("VENUS", 150, 9.5, '#00FFFF', 3.5, 177.4),      // Pure Cyan
+        new Planet("EARTH", 200, 10, '#00FF00', 3, 23.4),          // Pure Green
+        new Planet("MARS", 250, 5.3, '#FF0000', 2.4, 25.2),        // Pure Red
+        new Planet("JUPITER", 350, 30, '#0000FF', 1.3, 3.1),       // Pure Blue
+        new Planet("SATURN", 450, 25, '#FF00FF', 0.9, 26.7),       // Pure Purple
+        new Planet("URANUS", 550, 15, '#00FFFF', 0.6, 97.8),       // Pure Cyan
+        new Planet("NEPTUNE", 650, 15, '#FF8000', 0.5, 28.3)       // Pure Orange
+    ];
+}
+
+function draw() {
+    background(0);
+    
+    let orbitSpeedMultiplier = document.getElementById('orbitSpeed').value / 100;
+    let showOrbits = document.getElementById('showOrbits').checked;
+    
+    if (mouseIsPressed) {
+        camRotY += (mouseX - pmouseX) * 0.01;
+        camRotX += (mouseY - pmouseY) * 0.01;
+    }
+    
+    scale(zoom);
+    rotateX(camRotX);
+    rotateY(camRotY);
+    
+    // Strong lighting
+    ambientLight(255);
+    directionalLight(255, 255, 255, 0, 0, -1);
+    pointLight(255, 255, 255, 0, 0, 0);
+    pointLight(255, 255, 255, 0, 0, 200);
+    pointLight(255, 255, 255, 0, 0, -200);
+    
+    // Draw completely solid Sun
+    push();
+    noStroke();
+    fill('#FF4000');  // Solid bright orange
+    ambientMaterial('#FF4000');
+    specularMaterial('#FF4000');
+    sphere(SUN_SIZE);
+    pop();
+    
+    // Display orbits
+    if (showOrbits) {
+        for (let planet of planets) {
+            planet.displayOrbit();
+        }
+    }
+    
+    // Display planets
+    for (let planet of planets) {
+        planet.update(orbitSpeedMultiplier);
+        planet.display();
+    }
+}
+
+function mouseWheel(event) {
+    zoom -= event.delta * 0.001;
+    zoom = constrain(zoom, 0.1, 5);
+    return false;
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>

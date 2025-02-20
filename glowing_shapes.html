@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Colorful Morphing Paint Diffusion</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+        .controls {
+            margin: 20px;
+            color: white;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        input[type="range"] {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="toggleSimulation()">Play/Pause</button>
+        <input type="range" id="speedSlider" min="1" max="10" value="5">
+        <span>Speed</span>
+    </div>
+
+    <script>
+        let particles = [];
+        let isPlaying = true;
+        
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = random(30, 60);
+                this.colors = this.generateColors();
+                this.vx = random(-1, 1);
+                this.vy = random(-1, 1);
+                this.age = random(1000);
+                this.vertices = floor(random(3, 8));
+                this.rotation = 0;
+                this.rotationSpeed = random(-0.02, 0.02);
+                this.morphSpeed = random(0.001, 0.003);
+                this.targetVertices = this.vertices;
+                this.currentPoints = this.generatePoints(this.vertices);
+                this.targetPoints = this.generatePoints(this.vertices);
+                this.morphProgress = 0;
+                this.colorSpeed = random(0.01, 0.03);
+            }
+
+            generateColors() {
+                return {
+                    primary: color(random(255), random(255), random(255), 200),
+                    secondary: color(random(255), random(255), random(255), 200),
+                    accent: color(random(255), random(255), random(255), 200)
+                };
+            }
+
+            generatePoints(n) {
+                let points = [];
+                for (let i = 0; i < n; i++) {
+                    let angle = (TWO_PI / n) * i;
+                    let radius = this.size * (0.8 + random(0.4));
+                    points.push({
+                        x: cos(angle) * radius,
+                        y: sin(angle) * radius,
+                        color: color(random(255), random(255), random(255), 200)
+                    });
+                }
+                return points;
+            }
+
+            updateColors() {
+                let t = this.age * this.colorSpeed;
+                
+                // Create shifting colors using sine waves
+                this.colors.primary = color(
+                    127 + 127 * sin(t),
+                    127 + 127 * sin(t + TWO_PI/3),
+                    127 + 127 * sin(t + 2*TWO_PI/3),
+                    200
+                );
+                
+                this.colors.secondary = color(
+                    127 + 127 * sin(t + PI),
+                    127 + 127 * sin(t + PI + TWO_PI/3),
+                    127 + 127 * sin(t + PI + 2*TWO_PI/3),
+                    200
+                );
+                
+                this.colors.accent = color(
+                    127 + 127 * sin(t + PI/2),
+                    127 + 127 * sin(t + PI/2 + TWO_PI/3),
+                    127 + 127 * sin(t + PI/2 + 2*TWO_PI/3),
+                    200
+                );
+            }
+
+            update(speed) {
+                this.x += this.vx * speed;
+                this.y += this.vy * speed;
+                
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+                
+                this.age += 0.01 * speed;
+                this.updateColors();
+                this.rotation += this.rotationSpeed * speed;
+
+                this.morphProgress += this.morphSpeed * speed;
+                if (this.morphProgress >= 1) {
+                    this.morphProgress = 0;
+                    this.currentPoints = this.targetPoints;
+                    this.vertices = this.targetVertices;
+                    this.targetVertices = floor(random(3, 8));
+                    this.targetPoints = this.generatePoints(this.targetVertices);
+                }
+            }
+
+            draw() {
+                push();
+                translate(this.x, this.y);
+                rotate(this.rotation);
+                
+                // Create gradient effect
+                let gradient = drawingContext.createRadialGradient(0, 0, 0, 0, 0, this.size);
+                gradient.addColorStop(0, color(this.colors.primary));
+                gradient.addColorStop(0.5, color(this.colors.secondary));
+                gradient.addColorStop(1, color(this.colors.accent));
+                drawingContext.fillStyle = gradient;
+                
+                beginShape();
+                let maxPoints = max(this.currentPoints.length, this.targetPoints.length);
+                
+                // Draw main shape with gradient
+                for (let i = 0; i < maxPoints; i++) {
+                    let currentPoint = this.currentPoints[i % this.currentPoints.length];
+                    let targetPoint = this.targetPoints[i % this.targetPoints.length];
+                    
+                    let x = lerp(currentPoint.x, targetPoint.x, this.morphProgress);
+                    let y = lerp(currentPoint.y, targetPoint.y, this.morphProgress);
+                    
+                    vertex(x, y);
+                }
+                endShape(CLOSE);
+
+                // Add inner glow effect
+                noFill();
+                for (let i = 3; i > 0; i--) {
+                    strokeWeight(i);
+                    stroke(this.colors.accent, 50);
+                    beginShape();
+                    for (let i = 0; i < maxPoints; i++) {
+                        let currentPoint = this.currentPoints[i % this.currentPoints.length];
+                        let targetPoint = this.targetPoints[i % this.targetPoints.length];
+                        let x = lerp(currentPoint.x, targetPoint.x, this.morphProgress) * 0.9;
+                        let y = lerp(currentPoint.y, targetPoint.y, this.morphProgress) * 0.9;
+                        vertex(x, y);
+                    }
+                    endShape(CLOSE);
+                }
+                
+                pop();
+            }
+        }
+
+        function setup() {
+            createCanvas(800, 600);
+            // Initialize particles
+            for (let i = 0; i < 30; i++) {
+                particles.push(new Particle(random(width), random(height)));
+            }
+            background(0);
+        }
+
+        function draw() {
+            if (!isPlaying) return;
+            
+            background(0, 20);
+            let speed = document.getElementById('speedSlider').value / 5;
+
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+                p.update(speed);
+                p.draw();
+                
+                // Draw connecting lines with gradient
+                for (let j = i + 1; j < particles.length; j++) {
+                    let other = particles[j];
+                    let d = dist(p.x, p.y, other.x, other.y);
+                    if (d < 150) {
+                        let gradient = drawingContext.createLinearGradient(
+                            p.x, p.y, other.x, other.y
+                        );
+                        gradient.addColorStop(0, p.colors.accent);
+                        gradient.addColorStop(1, other.colors.accent);
+                        drawingContext.strokeStyle = gradient;
+                        drawingContext.lineWidth = map(d, 0, 150, 2, 0.1);
+                        drawingContext.beginPath();
+                        drawingContext.moveTo(p.x, p.y);
+                        drawingContext.lineTo(other.x, other.y);
+                        drawingContext.stroke();
+                    }
+                }
+            }
+        }
+
+        function toggleSimulation() {
+            isPlaying = !isPlaying;
+        }
+
+        function mousePressed() {
+            if (mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
+                for (let i = 0; i < 3; i++) {
+                    particles.push(new Particle(
+                        mouseX + random(-20, 20),
+                        mouseY + random(-20, 20)
+                    ));
+                }
+            }
+        }
+    </script>
+</body>
+</html>

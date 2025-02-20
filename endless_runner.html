@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<!-- Previous head and style sections remain the same -->
+<head>
+    <title>Endless Runner</title>
+    <style>
+        /* Previous styles remain the same */
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a2e;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        #gameCanvas {
+            border: 3px solid #e94560;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        #gameControls {
+            position: fixed;
+            top: 20px;
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+        .gameButton {
+            padding: 8px 16px;
+            font-size: 16px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .gameButton:hover {
+            background: #ff6b81;
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+        }
+        #gameOver {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            font-size: 16px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameControls">
+        <button class="gameButton" onclick="startGame()">Start</button>
+        <button class="gameButton" onclick="resetGame()">Reset</button>
+    </div>
+    <div id="score">Distance: 0m</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Distance: <span id="finalScore">0</span>m</p>
+        <button class="gameButton" onclick="resetGame()">Play Again</button>
+    </div>
+    <div id="controls">
+        Press SPACE to Jump (twice for double jump) | Press DOWN to Slide
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+
+        canvas.width = 800;
+        canvas.height = 400;
+
+        // Game constants
+        const GRAVITY = 0.8;
+        const JUMP_FORCE = -15;
+        const DOUBLE_JUMP_FORCE = -12; // Slightly weaker second jump
+        const GROUND_HEIGHT = 50;
+        const PLAYER_WIDTH = 40;
+        const PLAYER_HEIGHT = 60;
+        const OBSTACLE_SPEED = 5;
+        const GROUND_SPEED = 3;
+
+        // Game variables
+        let player = {
+            x: 100,
+            y: canvas.height - GROUND_HEIGHT - PLAYER_HEIGHT,
+            vy: 0,
+            isJumping: false,
+            canDoubleJump: true, // New variable for double jump
+            isSliding: false
+        };
+
+        let obstacles = [];
+        let distance = 0;
+        let gameRunning = false;
+        let groundOffset = 0;
+        let speed = 1;
+        let animationId;
+
+        // Previous Obstacle class remains the same
+        class Obstacle {
+            constructor() {
+                this.width = 30 + Math.random() * 30;
+                this.height = 30 + Math.random() * 70;
+                this.x = canvas.width;
+                this.y = canvas.height - GROUND_HEIGHT - this.height;
+                this.type = Math.random() > 0.5 ? 'high' : 'low';
+                
+                if (this.type === 'high') {
+                    this.y -= 50;
+                    this.height = 40;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = '#e94560';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+
+            update() {
+                this.x -= OBSTACLE_SPEED * speed;
+            }
+        }
+
+        // Previous helper functions remain the same
+        function createObstacle() {
+            if (obstacles.length === 0 || 
+                canvas.width - obstacles[obstacles.length - 1].x > 600 * Math.random() + 200) {
+                obstacles.push(new Obstacle());
+            }
+        }
+
+        function drawGround() {
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
+
+            ctx.strokeStyle = '#444';
+            for (let i = 0; i < canvas.width/50; i++) {
+                const x = (i * 50 - groundOffset) % canvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height - GROUND_HEIGHT);
+                ctx.lineTo(x + 30, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = 'white';
+            let height = player.isSliding ? PLAYER_HEIGHT/2 : PLAYER_HEIGHT;
+            let y = player.isSliding ? 
+                    player.y + PLAYER_HEIGHT/2 : 
+                    player.y;
+            
+            // Draw player body
+            ctx.fillRect(player.x, y, PLAYER_WIDTH, height);
+            
+            // Draw jump effect
+            if (player.isJumping) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.moveTo(player.x, y + height);
+                ctx.lineTo(player.x + PLAYER_WIDTH/2, y + height + 10);
+                ctx.lineTo(player.x + PLAYER_WIDTH, y + height);
+                ctx.fill();
+            }
+            
+            // Running animation
+            if (!player.isJumping && !player.isSliding) {
+                const legOffset = Math.sin(Date.now() * 0.01) * 10;
+                ctx.fillRect(
+                    player.x + 10, 
+                    y + height, 
+                    5, 
+                    legOffset
+                );
+                ctx.fillRect(
+                    player.x + PLAYER_WIDTH - 15, 
+                    y + height, 
+                    5, 
+                    -legOffset
+                );
+            }
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            groundOffset = (groundOffset + GROUND_SPEED * speed) % 50;
+            
+            // Update player
+            if (player.isJumping) {
+                player.vy += GRAVITY;
+                player.y += player.vy;
+
+                if (player.y >= canvas.height - GROUND_HEIGHT - PLAYER_HEIGHT) {
+                    player.y = canvas.height - GROUND_HEIGHT - PLAYER_HEIGHT;
+                    player.isJumping = false;
+                    player.canDoubleJump = true; // Reset double jump when landing
+                    player.vy = 0;
+                }
+            }
+
+            // Update obstacles and check collisions
+            createObstacle();
+            obstacles = obstacles.filter(obs => obs.x + obs.width > 0);
+            obstacles.forEach(obs => {
+                obs.update();
+
+                let playerHeight = player.isSliding ? PLAYER_HEIGHT/2 : PLAYER_HEIGHT;
+                let playerY = player.isSliding ? 
+                            player.y + PLAYER_HEIGHT/2 : 
+                            player.y;
+
+                if (player.x + PLAYER_WIDTH > obs.x &&
+                    player.x < obs.x + obs.width &&
+                    playerY + playerHeight > obs.y &&
+                    playerY < obs.y + obs.height) {
+                    gameOver();
+                }
+            });
+
+            distance += speed;
+            speed += 0.0001;
+            scoreElement.textContent = `Distance: ${Math.floor(distance)}m`;
+        }
+
+        function draw() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawGround();
+            obstacles.forEach(obs => obs.draw());
+            drawPlayer();
+        }
+
+        // Previous game control functions remain the same
+        function gameLoop() {
+            update();
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gameOverElement.style.display = 'none';
+                gameLoop();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            finalScoreElement.textContent = Math.floor(distance);
+            gameOverElement.style.display = 'block';
+        }
+
+        function resetGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            distance = 0;
+            speed = 1;
+            obstacles = [];
+            player = {
+                x: 100,
+                y: canvas.height - GROUND_HEIGHT - PLAYER_HEIGHT,
+                vy: 0,
+                isJumping: false,
+                canDoubleJump: true,
+                isSliding: false
+            };
+            scoreElement.textContent = 'Distance: 0m';
+            gameOverElement.style.display = 'none';
+            draw();
+        }
+
+        // Modified event listeners for double jump
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space' && gameRunning) {
+                if (!player.isJumping) {
+                    // First jump
+                    player.isJumping = true;
+                    player.vy = JUMP_FORCE;
+                } else if (player.canDoubleJump) {
+                    // Double jump
+                    player.vy = DOUBLE_JUMP_FORCE;
+                    player.canDoubleJump = false;
+                }
+            }
+            if (event.code === 'ArrowDown' && !player.isJumping && gameRunning) {
+                player.isSliding = true;
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.code === 'ArrowDown') {
+                player.isSliding = false;
+            }
+        });
+
+        // Modified touch controls for double jump
+        let lastTouchTime = 0;
+        canvas.addEventListener('touchstart', (event) => {
+            event.preventDefault();
+            const touch = event.touches[0];
+            const currentTime = new Date().getTime();
+            
+            if (touch.clientY > window.innerHeight / 2) {
+                player.isSliding = true;
+            } else if (gameRunning) {
+                if (!player.isJumping) {
+                    // First jump
+                    player.isJumping = true;
+                    player.vy = JUMP_FORCE;
+                } else if (player.canDoubleJump) {
+                    // Double jump
+                    player.vy = DOUBLE_JUMP_FORCE;
+                    player.canDoubleJump = false;
+                }
+            }
+            
+            lastTouchTime = currentTime;
+        });
+
+        canvas.addEventListener('touchend', () => {
+            player.isSliding = false;
+        });
+
+        // Initial draw
+        resetGame();
+    </script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <title>Solar System Simulation</title>
+    <style>
+        #pauseButton {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #pauseButton:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body style="margin:0; overflow:hidden;">
+<button id="pauseButton">Pause</button>
+<script>
+let planets = [];
+let zoom = 1;
+let zoomDirection = 1;
+let blackHolePhase = false;
+let time = 0;
+let isPaused = false;
+let autoZoom = true;
+
+class Planet {
+    constructor(name, distance, size, color, speed) {
+        this.name = name;
+        this.distance = distance;
+        this.size = size;
+        this.color = color;
+        this.speed = speed;
+        this.angle = random(TWO_PI);
+        this.x = 0;
+        this.y = 0;
+        this.orbit = [];
+        this.maxOrbitPoints = 100;
+    }
+
+    update() {
+        if (!blackHolePhase) {
+            if (!isPaused) {
+                this.angle += this.speed;
+            }
+            this.x = cos(this.angle) * this.distance;
+            this.y = sin(this.angle) * this.distance;
+            
+            // Update orbit trail
+            this.orbit.push({x: this.x, y: this.y});
+            if (this.orbit.length > this.maxOrbitPoints) {
+                this.orbit.shift();
+            }
+        } else {
+            // Black hole physics
+            if (!isPaused) {
+                let dx = this.x;
+                let dy = this.y;
+                let dist = sqrt(dx * dx + dy * dy);
+                let force = 0.1 / (dist * dist);
+                this.x -= dx * force;
+                this.y -= dy * force;
+            }
+        }
+    }
+
+    drawOrbit() {
+        if (!blackHolePhase) {
+            push();
+            translate(width/2, height/2);
+            noFill();
+            stroke(this.color, 50);
+            ellipse(0, 0, this.distance * 2 * zoom);
+            
+            // Draw orbit trail
+            beginShape();
+            noFill();
+            stroke(this.color, 100);
+            for (let pos of this.orbit) {
+                vertex(pos.x * zoom, pos.y * zoom);
+            }
+            endShape();
+            pop();
+        }
+    }
+
+    draw() {
+        push();
+        translate(width/2 + this.x * zoom, height/2 + this.y * zoom);
+        fill(this.color);
+        noStroke();
+        ellipse(0, 0, this.size * zoom);
+        
+        if (zoom > 0.3) {
+            fill(255);
+            textAlign(CENTER);
+            textSize(12 * zoom);
+            text(this.name, 0, -this.size * zoom - 5);
+        }
+        pop();
+    }
+}
+
+function setup() {
+    createCanvas(windowWidth, windowHeight);
+    
+    // Create planets
+    planets = [
+        new Planet("Mercury", 50, 5, color(169, 169, 169), 0.04),
+        new Planet("Venus", 75, 8, color(255, 198, 73), 0.03),
+        new Planet("Earth", 100, 8, color(100, 149, 237), 0.025),
+        new Planet("Mars", 125, 6, color(205, 127, 50), 0.02),
+        new Planet("Jupiter", 170, 20, color(255, 140, 0), 0.015),
+        new Planet("Saturn", 210, 17, color(238, 232, 205), 0.01),
+        new Planet("Uranus", 250, 12, color(173, 216, 230), 0.008),
+        new Planet("Neptune", 280, 11, color(0, 0, 128), 0.006)
+    ];
+
+    // Setup pause button
+    const pauseButton = document.getElementById('pauseButton');
+    pauseButton.addEventListener('click', () => {
+        isPaused = !isPaused;
+        pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+    });
+}
+
+function mouseWheel(event) {
+    // Disable auto zoom when user starts manual zooming
+    autoZoom = false;
+    
+    // Manual zoom with mouse wheel
+    if (event.delta > 0) {
+        zoom *= 0.95;
+    } else {
+        zoom *= 1.05;
+    }
+    
+    // Constrain zoom levels
+    zoom = constrain(zoom, 0.1, 5);
+    
+    return false; // Prevent default scrolling
+}
+
+function draw() {
+    background(0);
+    
+    if (!isPaused && autoZoom) {
+        time += 0.01;
+        
+        // Handle automatic zoom
+        if (!blackHolePhase) {
+            if (time < 10) {
+                zoom = map(sin(time/2), -1, 1, 1, 3);
+            } else if (time < 20) {
+                zoom = map(sin(time/2), -1, 1, 3, 0.1);
+            } else if (time < 30) {
+                zoom = map(sin(time/2), -1, 1, 0.1, 2);
+            } else {
+                blackHolePhase = true;
+            }
+        }
+    }
+
+    // Draw orbits first
+    for (let planet of planets) {
+        planet.drawOrbit();
+    }
+
+    // Draw sun/black hole
+    push();
+    translate(width/2, height/2);
+    if (!blackHolePhase) {
+        // Sun glow effect
+        for(let i = 5; i > 0; i--) {
+            fill(255, 150, 0, 10);
+            ellipse(0, 0, 40 * zoom * i);
+        }
+        fill(255, 255, 0);
+        ellipse(0, 0, 30 * zoom);
+    } else {
+        // Black hole effect
+        fill(0);
+        stroke(100, 0, 255);
+        ellipse(0, 0, 40);
+        
+        // Accretion disk
+        noFill();
+        for(let i = 0; i < 10; i++) {
+            stroke(255, 100 - i*10, 0, 100 - i*10);
+            ellipse(0, 0, 50 + i*5);
+        }
+    }
+    pop();
+
+    // Update and draw planets
+    for (let planet of planets) {
+        planet.update();
+        planet.draw();
+    }
+
+    // Reset simulation if all planets are consumed
+    if (blackHolePhase) {
+        let allConsumed = planets.every(p => 
+            abs(p.x) < 1 && abs(p.y) < 1
+        );
+        if (allConsumed) {
+            blackHolePhase = false;
+            time = 0;
+            autoZoom = true;
+            setup();
+        }
+    }
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jumping Dot</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a2e;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        #gameCanvas {
+            border: 3px solid #e94560;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        #gameControls {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        .gameButton {
+            padding: 8px 16px;
+            font-size: 16px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .gameButton:hover {
+            background: #ff6b81;
+        }
+        #score {
+            font-size: 24px;
+            margin-top: 20px;
+        }
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameControls">
+        <button class="gameButton" onclick="startGame()">Start</button>
+        <button class="gameButton" onclick="resetGame()">Reset</button>
+    </div>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button class="gameButton" onclick="resetGame()">Play Again</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+
+        const CANVAS_WIDTH = 400;
+        const CANVAS_HEIGHT = 600;
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // Game constants
+        const DOT_RADIUS = 10;
+        const GRAVITY = 0.6;
+        const JUMP_FORCE = -12;
+        const OBSTACLE_WIDTH = 40;
+        const OBSTACLE_GAP = 150;
+        const OBSTACLE_SPEED = 3;
+
+        // Game variables
+        let dot = {
+            x: CANVAS_WIDTH / 4,
+            y: CANVAS_HEIGHT / 2,
+            velocityY: 0
+        };
+
+        let obstacles = [];
+        let score = 0;
+        let gameRunning = false;
+        let animationId = null;
+
+        class Obstacle {
+            constructor() {
+                this.width = OBSTACLE_WIDTH;
+                this.gap = OBSTACLE_GAP;
+                this.x = CANVAS_WIDTH;
+                this.topHeight = Math.random() * (CANVAS_HEIGHT - OBSTACLE_GAP - 100) + 50;
+                this.bottomHeight = CANVAS_HEIGHT - this.topHeight - this.gap;
+                this.passed = false;
+            }
+
+            draw() {
+                ctx.fillStyle = '#e94560';
+                // Top obstacle
+                ctx.fillRect(this.x, 0, this.width, this.topHeight);
+                // Bottom obstacle
+                ctx.fillRect(
+                    this.x,
+                    CANVAS_HEIGHT - this.bottomHeight,
+                    this.width,
+                    this.bottomHeight
+                );
+            }
+
+            update() {
+                this.x -= OBSTACLE_SPEED;
+                
+                // Score counting
+                if (!this.passed && this.x + this.width < dot.x) {
+                    score++;
+                    scoreElement.textContent = `Score: ${score}`;
+                    this.passed = true;
+                }
+
+                // Collision detection
+                if (
+                    dot.x + DOT_RADIUS > this.x &&
+                    dot.x - DOT_RADIUS < this.x + this.width &&
+                    (dot.y - DOT_RADIUS < this.topHeight ||
+                     dot.y + DOT_RADIUS > CANVAS_HEIGHT - this.bottomHeight)
+                ) {
+                    gameOver();
+                }
+            }
+        }
+
+        function createObstacle() {
+            if (obstacles.length === 0 ||
+                CANVAS_WIDTH - obstacles[obstacles.length - 1].x >= 300) {
+                obstacles.push(new Obstacle());
+            }
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            // Update dot position
+            dot.velocityY += GRAVITY;
+            dot.y += dot.velocityY;
+
+            // Boundary checking
+            if (dot.y > CANVAS_HEIGHT - DOT_RADIUS) {
+                gameOver();
+            }
+            if (dot.y < DOT_RADIUS) {
+                dot.y = DOT_RADIUS;
+                dot.velocityY = 0;
+            }
+
+            // Create and update obstacles
+            createObstacle();
+            obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.width > 0);
+            obstacles.forEach(obstacle => obstacle.update());
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // Draw dot
+            ctx.beginPath();
+            ctx.arc(dot.x, dot.y, DOT_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.closePath();
+
+            // Draw obstacles
+            obstacles.forEach(obstacle => obstacle.draw());
+
+            // Draw score
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function jump() {
+            if (gameRunning) {
+                dot.velocityY = JUMP_FORCE;
+            }
+        }
+
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gameOverElement.style.display = 'none';
+                gameLoop();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            finalScoreElement.textContent = score;
+            gameOverElement.style.display = 'block';
+        }
+
+        function resetGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            score = 0;
+            obstacles = [];
+            dot = {
+                x: CANVAS_WIDTH / 4,
+                y: CANVAS_HEIGHT / 2,
+                velocityY: 0
+            };
+            scoreElement.textContent = 'Score: 0';
+            gameOverElement.style.display = 'none';
+            draw();
+        }
+
+        // Event listeners
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                if (!gameRunning) {
+                    startGame();
+                }
+                jump();
+            }
+        });
+
+        canvas.addEventListener('click', () => {
+            if (!gameRunning) {
+                startGame();
+            }
+            jump();
+        });
+
+        // Initial draw
+        resetGame();
+    </script>
+</body>
+</html>
