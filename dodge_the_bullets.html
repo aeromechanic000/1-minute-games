@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cyberpunk Dodge</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000000;
+            min-height: 100vh;
+        }
+        .button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #FF2A6D;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: Arial;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            background: #FF71CE;
+            transform: translateY(-2px);
+        }
+        .controls {
+            position: absolute;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+<script>
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 600;
+
+class Player {
+    constructor() {
+        this.x = GAME_WIDTH / 2;
+        this.y = GAME_HEIGHT / 2;
+        this.size = 20;
+        this.speed = 5;
+        this.color = '#01FFC3';
+    }
+
+    update() {
+        if (keyIsDown(LEFT_ARROW) || keyIsDown(65)) this.x -= this.speed; // A key
+        if (keyIsDown(RIGHT_ARROW) || keyIsDown(68)) this.x += this.speed; // D key
+        if (keyIsDown(UP_ARROW) || keyIsDown(87)) this.y -= this.speed; // W key
+        if (keyIsDown(DOWN_ARROW) || keyIsDown(83)) this.y += this.speed; // S key
+
+        this.x = constrain(this.x, this.size, GAME_WIDTH - this.size);
+        this.y = constrain(this.y, this.size, GAME_HEIGHT - this.size);
+    }
+
+    draw() {
+        fill(this.color);
+        noStroke();
+        circle(this.x, this.y, this.size);
+    }
+
+    hits(bullet) {
+        let d = dist(this.x, this.y, bullet.x, bullet.y);
+        return d < (this.size/2 + bullet.size/2);
+    }
+}
+
+class Bullet {
+    constructor() {
+        this.reset();
+        this.x = random(GAME_WIDTH);
+        this.y = random([-10, GAME_HEIGHT + 10]);
+        this.size = 8;
+    }
+
+    reset() {
+        let side = floor(random(4));
+        switch(side) {
+            case 0: // top
+                this.x = random(GAME_WIDTH);
+                this.y = -10;
+                break;
+            case 1: // right
+                this.x = GAME_WIDTH + 10;
+                this.y = random(GAME_HEIGHT);
+                break;
+            case 2: // bottom
+                this.x = random(GAME_WIDTH);
+                this.y = GAME_HEIGHT + 10;
+                break;
+            case 3: // left
+                this.x = -10;
+                this.y = random(GAME_HEIGHT);
+                break;
+        }
+        this.speed = random(3, 6);
+        this.angle = atan2(player.y - this.y, player.x - this.x);
+        this.color = '#FF2A6D';
+    }
+
+    update() {
+        this.x += cos(this.angle) * this.speed;
+        this.y += sin(this.angle) * this.speed;
+
+        if (this.isOffscreen()) {
+            this.reset();
+        }
+    }
+
+    draw() {
+        fill(this.color);
+        noStroke();
+        circle(this.x, this.y, this.size);
+    }
+
+    isOffscreen() {
+        return (this.x < -20 || this.x > GAME_WIDTH + 20 ||
+                this.y < -20 || this.y > GAME_HEIGHT + 20);
+    }
+}
+
+let player;
+let bullets = [];
+let score = 0;
+let gameOver = false;
+let isPaused = false;
+let pauseButton;
+let resetButton;
+let lastSpawnTime = 0;
+let spawnInterval = 1000; // ms between bullet spawns
+let maxBullets = 50;
+
+function setup() {
+    createCanvas(GAME_WIDTH, GAME_HEIGHT + 100);
+    player = new Player();
+    
+    let controlsDiv = createDiv('');
+    controlsDiv.class('controls');
+    controlsDiv.position(width/2 - 120, GAME_HEIGHT + 40);
+    
+    pauseButton = createButton('Pause');
+    pauseButton.parent(controlsDiv);
+    pauseButton.class('button');
+    pauseButton.mousePressed(togglePause);
+    
+    resetButton = createButton('Reset');
+    resetButton.parent(controlsDiv);
+    resetButton.class('button');
+    resetButton.mousePressed(resetGame);
+    
+    resetGame();
+}
+
+function togglePause() {
+    isPaused = !isPaused;
+    pauseButton.html(isPaused ? 'Resume' : 'Pause');
+}
+
+function resetGame() {
+    player = new Player();
+    bullets = [];
+    score = 0;
+    gameOver = false;
+    isPaused = false;
+    pauseButton.html('Pause');
+    lastSpawnTime = 0;
+    spawnInterval = 1000;
+}
+
+function draw() {
+    background('#000000');
+    
+    // Draw border
+    stroke('#05D9E8');
+    strokeWeight(2);
+    noFill();
+    rect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    
+    // Draw score
+    fill('#05D9E8');
+    textSize(24);
+    textAlign(CENTER);
+    text(`Score: ${floor(score)}`, width/2, 35);
+
+    if (!gameOver && !isPaused) {
+        // Update score
+        score += frameRate() / 60;
+        
+        // Spawn new bullets
+        if (millis() - lastSpawnTime > spawnInterval && bullets.length < maxBullets) {
+            bullets.push(new Bullet());
+            lastSpawnTime = millis();
+            // Gradually decrease spawn interval
+            spawnInterval = max(200, 1000 - score/2);
+        }
+
+        player.update();
+        bullets.forEach(bullet => bullet.update());
+
+        // Check collisions
+        for (let bullet of bullets) {
+            if (player.hits(bullet)) {
+                gameOver = true;
+                break;
+            }
+        }
+    }
+
+    // Draw everything
+    player.draw();
+    bullets.forEach(bullet => bullet.draw());
+
+    if (gameOver) {
+        fill('#FF2A6D');
+        textSize(40);
+        textAlign(CENTER);
+        text('GAME OVER', width/2, height/2);
+        textSize(24);
+        text('Final Score: ' + floor(score), width/2, height/2 + 40);
+    }
+
+    if (isPaused) {
+        fill('#05D9E8');
+        textSize(40);
+        textAlign(CENTER);
+        text('PAUSED', width/2, height/2);
+    }
+}
+
+function keyPressed() {
+    if (keyCode === 80) { // P key
+        togglePause();
+    }
+    if (keyCode === 82) { // R key
+        resetGame();
+    }
+}
+</script>
+</body>
+</html>

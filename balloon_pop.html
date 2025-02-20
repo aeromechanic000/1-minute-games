@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cyberpunk Balloon Pop</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #0a0a1b;
+            font-family: 'Arial', sans-serif;
+            color: #00ff9d;
+            text-shadow: 0 0 10px #00ff9d;
+        }
+        #gameCanvas {
+            border: 3px solid #ff00ff;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 0 20px #ff00ff;
+            cursor: crosshair;
+        }
+        #gameControls {
+            position: fixed;
+            top: 20px;
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+        .gameButton {
+            padding: 8px 16px;
+            font-size: 16px;
+            background: #ff00ff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 10px #ff00ff;
+        }
+        .gameButton:hover {
+            background: #ff60ff;
+            box-shadow: 0 0 20px #ff00ff;
+            transform: scale(1.1);
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: #00ff9d;
+            text-shadow: 0 0 10px #00ff9d;
+        }
+        #gameOver {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 10, 27, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+            border: 2px solid #ff00ff;
+            box-shadow: 0 0 30px #ff00ff;
+        }
+        #lives {
+            position: fixed;
+            top: 60px;
+            left: 20px;
+            font-size: 24px;
+            color: #ff0055;
+            text-shadow: 0 0 10px #ff0055;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameControls">
+        <button class="gameButton" onclick="startGame()">Start</button>
+        <button class="gameButton" onclick="resetGame()">Reset</button>
+    </div>
+    <div id="score">Score: 0</div>
+    <div id="lives">Lives: 3</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOver">
+        <h2>GAME OVER</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button class="gameButton" onclick="resetGame()">Play Again</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Game variables
+        let score = 0;
+        let lives = 3;
+        let balloons = [];
+        let particles = [];
+        let gameRunning = false;
+        let spawnRate = 60;
+        let frameCount = 0;
+        let animationId;
+
+        // Neon colors for cyberpunk theme
+        const neonColors = [
+            '#ff00ff', // Pink
+            '#00ff9d', // Cyan
+            '#ff0055', // Red
+            '#00ffff', // Blue
+            '#ffff00'  // Yellow
+        ];
+
+        class Balloon {
+            constructor() {
+                this.radius = 20 + Math.random() * 20;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = canvas.height + this.radius;
+                this.speed = 2 + Math.random() * 2;
+                this.color = neonColors[Math.floor(Math.random() * neonColors.length)];
+                this.glowSize = 10;
+                this.angle = 0;
+                this.wobbleSpeed = 0.02 + Math.random() * 0.02;
+                this.wobbleRadius = 2 + Math.random() * 2;
+            }
+
+            update() {
+                this.y -= this.speed;
+                this.angle += this.wobbleSpeed;
+                this.x += Math.sin(this.angle) * this.wobbleRadius;
+                return this.y + this.radius < 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.beginPath();
+                
+                // Glow effect
+                ctx.shadowBlur = this.glowSize;
+                ctx.shadowColor = this.color;
+                
+                // Balloon body
+                ctx.fillStyle = this.color;
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Balloon string
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.radius);
+                ctx.lineTo(this.x, this.y + this.radius + 20);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            contains(x, y) {
+                const dx = this.x - x;
+                const dy = this.y - y;
+                return dx * dx + dy * dy <= this.radius * this.radius;
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 3 + 1;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.alpha = 1;
+                this.decay = 0.02 + Math.random() * 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+                return this.alpha <= 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            frameCount++;
+            if (frameCount >= spawnRate) {
+                balloons.push(new Balloon());
+                frameCount = 0;
+                spawnRate = Math.max(30, spawnRate - 0.5); // Increase difficulty
+            }
+
+            // Update balloons
+            for (let i = balloons.length - 1; i >= 0; i--) {
+                if (balloons[i].update()) {
+                    balloons.splice(i, 1);
+                    lives--;
+                    livesElement.textContent = `Lives: ${lives}`;
+                    if (lives <= 0) gameOver();
+                }
+            }
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                if (particles[i].update()) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function draw() {
+            // Clear canvas with a cyberpunk background
+            ctx.fillStyle = '#0a0a1b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid effect
+            ctx.strokeStyle = '#1a1a3a';
+            ctx.lineWidth = 1;
+            const gridSize = 30;
+            for (let i = 0; i < canvas.width; i += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // Draw game elements
+            particles.forEach(particle => particle.draw());
+            balloons.forEach(balloon => balloon.draw());
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gameOverElement.style.display = 'none';
+                gameLoop();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            finalScoreElement.textContent = score;
+            gameOverElement.style.display = 'block';
+        }
+
+        function resetGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            score = 0;
+            lives = 3;
+            balloons = [];
+            particles = [];
+            spawnRate = 60;
+            frameCount = 0;
+            scoreElement.textContent = `Score: ${score}`;
+            livesElement.textContent = `Lives: ${lives}`;
+            gameOverElement.style.display = 'none';
+            draw();
+        }
+
+        canvas.addEventListener('click', (event) => {
+            if (!gameRunning) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            for (let i = balloons.length - 1; i >= 0; i--) {
+                if (balloons[i].contains(x, y)) {
+                    createExplosion(balloons[i].x, balloons[i].y, balloons[i].color);
+                    balloons.splice(i, 1);
+                    score += 10;
+                    scoreElement.textContent = `Score: ${score}`;
+                    break;
+                }
+            }
+        });
+
+        // Initial draw
+        resetGame();
+    </script>
+</body>
+</html>

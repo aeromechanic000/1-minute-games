@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Catch the Falling Items</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a2e;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+        #gameCanvas {
+            border: 3px solid #e94560;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        #gameControls {
+            position: fixed;
+            top: 20px;
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+        .gameButton {
+            padding: 8px 16px;
+            font-size: 16px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .gameButton:hover {
+            background: #ff6b81;
+            transform: scale(1.1);
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+        }
+        #lives {
+            position: fixed;
+            top: 60px;
+            left: 20px;
+            font-size: 24px;
+            color: #ff4757;
+        }
+        #gameOver {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameControls">
+        <button class="gameButton" onclick="startGame()">Start</button>
+        <button class="gameButton" onclick="resetGame()">Reset</button>
+    </div>
+    <div id="score">Score: 0</div>
+    <div id="lives">Lives: 3</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button class="gameButton" onclick="resetGame()">Play Again</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Game objects
+        const basket = {
+            width: 100,
+            height: 50,
+            x: canvas.width / 2 - 50,
+            y: canvas.height - 60,
+            speed: 8
+        };
+
+        // Item types with their properties
+        const itemTypes = [
+            { name: '🍎', color: '#ff4757', points: 10 },
+            { name: '🍌', color: '#ffd32a', points: 15 },
+            { name: '🍇', color: '#9b59b6', points: 20 },
+            { name: '⭐', color: '#ffd700', points: 30 },
+            { name: '💎', color: '#3498db', points: 50 }
+        ];
+
+        // Game variables
+        let items = [];
+        let score = 0;
+        let lives = 3;
+        let gameRunning = false;
+        let spawnRate = 60;
+        let frameCount = 0;
+        let animationId;
+        let difficulty = 1;
+
+        class Item {
+            constructor() {
+                this.type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+                this.width = 40;
+                this.height = 40;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.speed = 2 + Math.random() * 2 * difficulty;
+                this.rotation = 0;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.2;
+            }
+
+            update() {
+                this.y += this.speed;
+                this.rotation += this.rotationSpeed;
+                return this.y > canvas.height;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.width/2, this.y + this.height/2);
+                ctx.rotate(this.rotation);
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.type.name, 0, 0);
+                ctx.restore();
+            }
+
+            checkCollision() {
+                return this.x < basket.x + basket.width &&
+                       this.x + this.width > basket.x &&
+                       this.y + this.height > basket.y &&
+                       this.y < basket.y + basket.height;
+            }
+        }
+
+        function createItem() {
+            items.push(new Item());
+        }
+
+        function drawBasket() {
+            ctx.fillStyle = '#e94560';
+            // Draw basket body
+            ctx.beginPath();
+            ctx.moveTo(basket.x, basket.y);
+            ctx.lineTo(basket.x + basket.width, basket.y);
+            ctx.lineTo(basket.x + basket.width - 10, basket.y + basket.height);
+            ctx.lineTo(basket.x + 10, basket.y + basket.height);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw basket handle
+            ctx.strokeStyle = '#e94560';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(basket.x + basket.width/2, basket.y - 10, basket.width/2, 0, Math.PI);
+            ctx.stroke();
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            frameCount++;
+            if (frameCount >= spawnRate) {
+                createItem();
+                frameCount = 0;
+                spawnRate = Math.max(20, spawnRate - 0.5);
+                difficulty = Math.min(3, difficulty + 0.01);
+            }
+
+            // Update items
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                
+                if (item.checkCollision()) {
+                    // Caught item
+                    score += item.type.points;
+                    scoreElement.textContent = `Score: ${score}`;
+                    items.splice(i, 1);
+                    createCatchEffect(item.x + item.width/2, item.y + item.height/2);
+                } else if (item.update()) {
+                    // Missed item
+                    items.splice(i, 1);
+                    lives--;
+                    livesElement.textContent = `Lives: ${lives}`;
+                    if (lives <= 0) gameOver();
+                }
+            }
+
+            // Move basket
+            if (keys.ArrowLeft) basket.x = Math.max(0, basket.x - basket.speed);
+            if (keys.ArrowRight) basket.x = Math.min(canvas.width - basket.width, basket.x + basket.speed);
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw items
+            items.forEach(item => item.draw());
+
+            // Draw basket
+            drawBasket();
+        }
+
+        function createCatchEffect(x, y) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('+' + score, x, y - 20);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gameOverElement.style.display = 'none';
+                gameLoop();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            finalScoreElement.textContent = score;
+            gameOverElement.style.display = 'block';
+        }
+
+        function resetGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            score = 0;
+            lives = 3;
+            items = [];
+            spawnRate = 60;
+            frameCount = 0;
+            difficulty = 1;
+            basket.x = canvas.width / 2 - basket.width / 2;
+            scoreElement.textContent = `Score: ${score}`;
+            livesElement.textContent = `Lives: ${lives}`;
+            gameOverElement.style.display = 'none';
+            draw();
+        }
+
+        // Keyboard controls
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Touch controls
+        let touchStartX = null;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (touchStartX === null) return;
+            
+            const touch = e.touches[0];
+            const diff = touch.clientX - touchStartX;
+            basket.x = Math.max(0, Math.min(canvas.width - basket.width, basket.x + diff));
+            touchStartX = touch.clientX;
+        });
+
+        canvas.addEventListener('touchend', () => {
+            touchStartX = null;
+        });
+
+        // Mouse controls
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            basket.x = Math.max(0, Math.min(canvas.width - basket.width, mouseX - basket.width/2));
+        });
+
+        // Initial draw
+        resetGame();
+    </script>
+</body>
+</html>

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Paddle Ball</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a2e;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+        #gameCanvas {
+            border: 3px solid #e94560;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+        }
+        #gameControls {
+            position: fixed;
+            top: 20px;
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+        .gameButton {
+            padding: 8px 16px;
+            font-size: 16px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .gameButton:hover {
+            background: #ff6b81;
+            transform: scale(1.1);
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+        }
+        #lives {
+            position: fixed;
+            top: 60px;
+            left: 20px;
+            font-size: 24px;
+            color: #ff4757;
+        }
+        #gameOver {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameControls">
+        <button class="gameButton" onclick="startGame()">Start</button>
+        <button class="gameButton" onclick="resetGame()">Reset</button>
+    </div>
+    <div id="score">Score: 0</div>
+    <div id="lives">Lives: 3</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button class="gameButton" onclick="resetGame()">Play Again</button>
+    </div>
+
+<script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        // Game constants
+        const BLOCK_ROWS = 5;
+        const BLOCK_COLS = 8;
+        const BLOCK_WIDTH = 80;
+        const BLOCK_HEIGHT = 25;
+        const BLOCK_PADDING = 10;
+        const BLOCK_TOP_OFFSET = 50;
+        const BLOCK_LEFT_OFFSET = (canvas.width - (BLOCK_COLS * (BLOCK_WIDTH + BLOCK_PADDING))) / 2;
+
+        // Game objects
+        const paddle = {
+            width: 100,
+            height: 15,
+            x: canvas.width / 2 - 50,
+            y: canvas.height - 30,
+            speed: 8,
+            color: '#e94560'
+        };
+
+        const ball = {
+            radius: 8,
+            x: canvas.width / 2,
+            y: canvas.height - 50,
+            speedX: 0,
+            speedY: 0,
+            baseSpeed: 6,
+            color: '#fff',
+            inPlay: false
+        };
+
+        const blockColors = ['#ff4757', '#2ed573', '#1e90ff', '#ffd32a', '#9b59b6'];
+        let blocks = [];
+        let score = 0;
+        let lives = 3;
+        let gameRunning = false;
+        let animationId;
+        let particles = [];
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.size = Math.random() * 3 + 2;
+                this.speedX = (Math.random() - 0.5) * 6;
+                this.speedY = (Math.random() - 0.5) * 6;
+                this.alpha = 1;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.alpha -= 0.01;
+                return this.alpha <= 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createBlocks() {
+            blocks = [];
+            for (let row = 0; row < BLOCK_ROWS; row++) {
+                for (let col = 0; col < BLOCK_COLS; col++) {
+                    blocks.push({
+                        x: BLOCK_LEFT_OFFSET + col * (BLOCK_WIDTH + BLOCK_PADDING),
+                        y: BLOCK_TOP_OFFSET + row * (BLOCK_HEIGHT + BLOCK_PADDING),
+                        width: BLOCK_WIDTH,
+                        height: BLOCK_HEIGHT,
+                        color: blockColors[row],
+                        strength: Math.min(3, BLOCK_ROWS - row)
+                    });
+                }
+            }
+        }
+
+        function createBlockExplosion(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function launchBall() {
+            if (!ball.inPlay) {
+                ball.inPlay = true;
+                const angle = (Math.random() * 60 + 60) * Math.PI / 180;
+                ball.speedX = ball.baseSpeed * Math.cos(angle) * (Math.random() < 0.5 ? 1 : -1);
+                ball.speedY = -ball.baseSpeed * Math.sin(angle);
+            }
+        }
+
+        function resetBall() {
+            ball.inPlay = false;
+            ball.x = paddle.x + paddle.width / 2;
+            ball.y = paddle.y - ball.radius;
+            ball.speedX = 0;
+            ball.speedY = 0;
+        }
+
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+function update() {
+            if (!gameRunning) return;
+
+            // Update particles
+            particles = particles.filter(particle => !particle.update());
+
+            // Move paddle
+            if (keys.ArrowLeft) paddle.x = Math.max(0, paddle.x - paddle.speed);
+            if (keys.ArrowRight) paddle.x = Math.min(canvas.width - paddle.width, paddle.x + paddle.speed);
+
+            // Update ball
+            if (ball.inPlay) {
+                // Gradually increase ball speed
+                const speedMultiplier = 1 + (score / 500);
+                const normalizedSpeedX = ball.speedX / Math.sqrt(ball.speedX * ball.speedX + ball.speedY * ball.speedY);
+                const normalizedSpeedY = ball.speedY / Math.sqrt(ball.speedX * ball.speedX + ball.speedY * ball.speedY);
+                ball.speedX = normalizedSpeedX * ball.baseSpeed * speedMultiplier;
+                ball.speedY = normalizedSpeedY * ball.baseSpeed * speedMultiplier;
+
+                ball.x += ball.speedX;
+                ball.y += ball.speedY;
+
+                // Wall collisions
+                if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
+                    ball.speedX = -ball.speedX;
+                }
+                if (ball.y - ball.radius < 0) {
+                    ball.speedY = -ball.speedY;
+                }
+
+                // Paddle collision
+                if (ball.y + ball.radius > paddle.y &&
+                    ball.x > paddle.x &&
+                    ball.x < paddle.x + paddle.width &&
+                    ball.y < paddle.y + paddle.height) {
+                    ball.speedY = -Math.abs(ball.speedY); // Ensure upward movement
+                    const hitPoint = (ball.x - (paddle.x + paddle.width/2)) / (paddle.width/2);
+                    ball.speedX = hitPoint * 5;
+                }
+
+                // Block collisions
+                for (let i = blocks.length - 1; i >= 0; i--) {
+                    const block = blocks[i];
+                    const ballRect = {
+                        x: ball.x - ball.radius,
+                        y: ball.y - ball.radius,
+                        width: ball.radius * 2,
+                        height: ball.radius * 2
+                    };
+
+                    if (checkCollision(ballRect, block)) {
+                        // Determine collision side
+                        const hitFromTop = ball.y + ball.radius - ball.speedY <= block.y;
+                        const hitFromBottom = ball.y - ball.radius - ball.speedY >= block.y + block.height;
+                        const hitFromLeft = ball.x + ball.radius - ball.speedX <= block.x;
+                        const hitFromRight = ball.x - ball.radius - ball.speedX >= block.x + block.width;
+
+                        // Bounce based on collision side
+                        if (hitFromTop || hitFromBottom) {
+                            ball.speedY = -ball.speedY;
+                        } else if (hitFromLeft || hitFromRight) {
+                            ball.speedX = -ball.speedX;
+                        }
+
+                        // Damage block
+                        block.strength--;
+                        if (block.strength <= 0) {
+                            createBlockExplosion(block.x + block.width/2, block.y + block.height/2, block.color);
+                            blocks.splice(i, 1);
+                            score += 10;
+                            scoreElement.textContent = `Score: ${score}`;
+                        }
+                        break;
+                    }
+                }
+
+                // Ball out of bounds
+                if (ball.y + ball.radius > canvas.height) {
+                    lives--;
+                    livesElement.textContent = `Lives: ${lives}`;
+                    if (lives <= 0) {
+                        gameOver();
+                    } else {
+                        resetBall();
+                    }
+                }
+            } else {
+                // Ball follows paddle before launch
+                ball.x = paddle.x + paddle.width / 2;
+                ball.y = paddle.y - ball.radius;
+            }
+
+            // Check win condition
+            if (blocks.length === 0) {
+                gameWin();
+            }
+        }
+
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw particles
+            particles.forEach(particle => particle.draw());
+
+            // Draw blocks with strength indicator
+            blocks.forEach(block => {
+                ctx.fillStyle = block.color;
+                ctx.fillRect(block.x, block.y, block.width, block.height);
+                
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(
+                    block.strength, 
+                    block.x + block.width/2, 
+                    block.y + block.height/2
+                );
+            });
+
+            // Draw paddle
+            ctx.fillStyle = paddle.color;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+
+            // Draw ball
+            ctx.fillStyle = ball.color;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw launch instruction
+            if (!ball.inPlay && gameRunning) {
+                ctx.fillStyle = '#fff';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Press SPACE to launch', canvas.width/2, canvas.height/2);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gameOverElement.style.display = 'none';
+                gameLoop();
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            finalScoreElement.textContent = score;
+            gameOverElement.style.display = 'block';
+        }
+
+        function gameWin() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            finalScoreElement.textContent = score;
+            gameOverElement.querySelector('h2').textContent = 'You Win!';
+            gameOverElement.style.display = 'block';
+        }
+
+        function resetGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            score = 0;
+            lives = 3;
+            paddle.x = canvas.width / 2 - paddle.width / 2;
+            resetBall();
+            createBlocks();
+            particles = [];
+            scoreElement.textContent = `Score: ${score}`;
+            livesElement.textContent = `Lives: ${lives}`;
+            gameOverElement.style.display = 'none';
+            gameOverElement.querySelector('h2').textContent = 'Game Over!';
+            draw();
+        }
+
+        // Event listeners
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Space' && gameRunning) {
+                launchBall();
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Mouse controls
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            paddle.x = Math.max(0, Math.min(canvas.width - paddle.width, mouseX - paddle.width/2));
+        });
+
+        canvas.addEventListener('click', () => {
+            if (gameRunning) launchBall();
+        });
+
+        // Touch controls
+        let touchStartX = null;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            if (gameRunning) launchBall();
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (touchStartX === null) return;
+            
+            const touch = e.touches[0];
+            const diff = touch.clientX - touchStartX;
+            paddle.x = Math.max(0, Math.min(canvas.width - paddle.width, paddle.x + diff));
+            touchStartX = touch.clientX;
+        });
+
+        // Initial setup
+        createBlocks();
+        resetGame();
+    </script>
+</body>
+</html>
