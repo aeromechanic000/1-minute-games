@@ -1,191 +1,233 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Ping Pong Game</title>
+    <title>P5.js Ping Pong</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
     <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
         canvas {
             display: block;
-            margin: 0 auto;
+            margin: 20px auto;
+            border: 15px solid #333;
+            border-radius: 10px;
         }
     </style>
 </head>
 <body>
 <script>
-let ball = {
-    x: 400,
-    y: 300,
-    size: 15,
-    speedX: 5,
-    speedY: 5
-};
-
-let playerPaddle = {
-    x: 50,
-    y: 300,
-    width: 10,
-    height: 100,
-    speed: 8,
-    score: 0
-};
-
-let computerPaddle = {
-    x: 750,
-    y: 300,
-    width: 10,
-    height: 100,
-    speed: 5,
-    score: 0
-};
-
+let ball;
+let playerPaddle;
+let computerPaddle;
+let playerScore = 0;
+let computerScore = 0;
 let gameStarted = false;
-let startButton, resetButton;
+let frameThickness = 10;
 
 function setup() {
-    createCanvas(800, 650); 
-    // Create buttons
-    startButton = createButton('Start');
-    startButton.position(width/2 - 80, height - 40);
-    startButton.size(70, 30);
-    startButton.style('font-size', '16px');
-    startButton.mousePressed(startGame);
-    
-    resetButton = createButton('Reset');
-    resetButton.position(width/2 + 10, height - 40);
-    resetButton.size(70, 30);
-    resetButton.style('font-size', '16px');
-    resetButton.mousePressed(resetGame);
-    
+    createCanvas(800, 500);
     resetGame();
 }
 
+function resetGame() {
+    // Initialize ball
+    ball = {
+        x: width/2,
+        y: height/2,
+        size: 15,
+        speedX: 0,
+        speedY: 0,
+        speed: 5
+    };
+    
+    // Initialize paddles
+    playerPaddle = {
+        x: 50,
+        y: height/2,
+        width: 10,
+        height: 60,
+        speed: 5
+    };
+    
+    computerPaddle = {
+        x: width - 50,
+        y: height/2,
+        width: 10,
+        height: 60,
+        speed: 4
+    };
+    
+    playerScore = 0;
+    computerScore = 0;
+    gameStarted = false;
+}
+
 function draw() {
+    // Draw background and frame
     background(255);
-    drawCourt();
-    drawScores();
-    drawPaddles();
-    drawBall();
+    drawFrame();
     
-    if (gameStarted) {
-        moveBall();
-        movePlayerPaddle();
-        moveComputerPaddle();
-        checkCollisions();
-    }
-}
-
-function drawCourt() {
-    // Border
+    // Draw play area
+    push();
+    translate(frameThickness, frameThickness);
+    
+    // Draw center line
     stroke(0);
-    strokeWeight(2);
-    noFill();
-    rect(0, 0, width, height - 50); // Adjusted height for buttons
-    
-    // Center line
-    for(let i = 0; i < height - 50; i += 20) {
-        line(width/2, i, width/2, i + 10);
+    strokeWeight(1);
+    for(let i = 0; i < height - 2*frameThickness; i += 20) {
+        line(width/2 - frameThickness, i, width/2 - frameThickness, i + 10);
     }
-}
-
-function drawScores() {
+    
+    // Draw scores
     textSize(32);
+    textAlign(CENTER);
     fill(0);
-    noStroke();
-    text(playerPaddle.score, width/4, 50);
-    text(computerPaddle.score, 3*width/4, 50);
-}
-
-function drawPaddles() {
+    text(playerScore, width/4, 50);
+    text(computerScore, 3*width/4, 50);
+    
+    // Draw paddles
     fill(0);
     stroke(255);
     rect(playerPaddle.x, playerPaddle.y, playerPaddle.width, playerPaddle.height);
     rect(computerPaddle.x, computerPaddle.y, computerPaddle.width, computerPaddle.height);
-}
-
-function drawBall() {
-    stroke(0);
+    
+    // Draw ball
     fill(255);
+    stroke(0);
     ellipse(ball.x, ball.y, ball.size);
+    
+    pop();
+    
+    // Draw buttons
+    drawButtons();
+    
+    if(gameStarted) {
+        updateGame();
+    }
 }
 
-function moveBall() {
+function drawFrame() {
+    // Draw outer frame
+    noFill();
+    strokeWeight(frameThickness);
+    stroke(0);
+    rect(frameThickness/2, frameThickness/2, width - frameThickness, height - frameThickness);
+}
+
+function drawButtons() {
+    let buttonWidth = 100;
+    let buttonHeight = 40;
+    let buttonY = height - 60;
+    let spacing = 20;
+    
+    // Start button
+    stroke(0);
+    strokeWeight(2);
+    fill(gameStarted ? '#cccccc' : '#ffffff');
+    rect(width/2 - buttonWidth - spacing, buttonY, buttonWidth, buttonHeight, 5);
+    fill(0);
+    noStroke();
+    textSize(18);
+    textAlign(CENTER, CENTER);
+    text("Start", width/2 - spacing - buttonWidth/2, buttonY + buttonHeight/2);
+    
+    // Reset button
+    stroke(0);
+    strokeWeight(2);
+    fill(255);
+    rect(width/2 + spacing, buttonY, buttonWidth, buttonHeight, 5);
+    fill(0);
+    noStroke();
+    text("Reset", width/2 + spacing + buttonWidth/2, buttonY + buttonHeight/2);
+}
+
+function updateGame() {
+    // Move ball
     ball.x += ball.speedX;
     ball.y += ball.speedY;
-}
-
-function movePlayerPaddle() {
-    if (keyIsDown(UP_ARROW)) {
-        playerPaddle.y = max(0, playerPaddle.y - playerPaddle.speed);
-    }
-    if (keyIsDown(DOWN_ARROW)) {
-        playerPaddle.y = min(height - 50 - playerPaddle.height, playerPaddle.y + playerPaddle.speed);
-    }
-}
-
-function moveComputerPaddle() {
-    let targetY = ball.y - computerPaddle.height/2;
-    if (computerPaddle.y < targetY) {
-        computerPaddle.y += computerPaddle.speed;
-    }
-    if (computerPaddle.y > targetY) {
-        computerPaddle.y -= computerPaddle.speed;
-    }
     
-    computerPaddle.y = constrain(computerPaddle.y, 0, height - 50 - computerPaddle.height);
-}
-
-function checkCollisions() {
-    // Ball collision with top and bottom walls
-    if (ball.y < 0 || ball.y > height - 50) {
+    // Ball collisions with top and bottom
+    if(ball.y < frameThickness || ball.y > height - frameThickness) {
         ball.speedY *= -1;
     }
     
-    // Ball collision with paddles
-    if (ball.x < playerPaddle.x + playerPaddle.width && 
-        ball.y > playerPaddle.y && 
-        ball.y < playerPaddle.y + playerPaddle.height) {
-        ball.speedX *= -1;
-        ball.x = playerPaddle.x + playerPaddle.width;
+    // Ball collisions with paddles
+    if(checkPaddleCollision(playerPaddle) || checkPaddleCollision(computerPaddle)) {
+        ball.speedX *= -1.1; // Increase speed slightly
     }
     
-    if (ball.x > computerPaddle.x && 
-        ball.y > computerPaddle.y && 
-        ball.y < computerPaddle.y + computerPaddle.height) {
-        ball.speedX *= -1;
-        ball.x = computerPaddle.x;
+    // Score points
+    if(ball.x < frameThickness) {
+        computerScore++;
+        resetBall();
+    } else if(ball.x > width - frameThickness) {
+        playerScore++;
+        resetBall();
     }
     
-    // Scoring
-    if (ball.x < 0) {
-        computerPaddle.score++;
-        resetBall();
+    // Move player paddle
+    if(keyIsDown(UP_ARROW) && playerPaddle.y > frameThickness) {
+        playerPaddle.y -= playerPaddle.speed;
     }
-    if (ball.x > width) {
-        playerPaddle.score++;
-        resetBall();
+    if(keyIsDown(DOWN_ARROW) && playerPaddle.y < height - frameThickness - playerPaddle.height) {
+        playerPaddle.y += playerPaddle.speed;
     }
+    
+    // Computer AI
+    let target = ball.y - computerPaddle.height/2;
+    if(computerPaddle.y < target && computerPaddle.y < height - frameThickness - computerPaddle.height) {
+        computerPaddle.y += computerPaddle.speed;
+    }
+    if(computerPaddle.y > target && computerPaddle.y > frameThickness) {
+        computerPaddle.y -= computerPaddle.speed;
+    }
+}
+
+function checkPaddleCollision(paddle) {
+    return ball.x - ball.size/2 < paddle.x + paddle.width &&
+           ball.x + ball.size/2 > paddle.x &&
+           ball.y - ball.size/2 < paddle.y + paddle.height &&
+           ball.y + ball.size/2 > paddle.y;
 }
 
 function resetBall() {
     ball.x = width/2;
-    ball.y = (height - 50)/2;
-    ball.speedX = random([-5, 5]);
-    ball.speedY = random(-5, 5);
+    ball.y = height/2;
+    ball.speedX = (Math.random() > 0.5 ? 1 : -1) * ball.speed;
+    ball.speedY = (Math.random() * 2 - 1) * ball.speed;
 }
 
-function startGame() {
-    gameStarted = true;
-}
-
-function resetGame() {
-    gameStarted = false;
-    playerPaddle.score = 0;
-    computerPaddle.score = 0;
-    playerPaddle.y = (height - 50)/2 - playerPaddle.height/2;
-    computerPaddle.y = (height - 50)/2 - computerPaddle.height/2;
-    resetBall();
+function mousePressed() {
+    let buttonWidth = 100;
+    let buttonHeight = 40;
+    let buttonY = height - 60;
+    let spacing = 20;
+    
+    // Start button clicked
+    if(mouseX > width/2 - buttonWidth - spacing && 
+       mouseX < width/2 - spacing &&
+       mouseY > buttonY && 
+       mouseY < buttonY + buttonHeight) {
+        if(!gameStarted) {
+            gameStarted = true;
+            resetBall();
+        }
+    }
+    
+    // Reset button clicked
+    if(mouseX > width/2 + spacing && 
+       mouseX < width/2 + spacing + buttonWidth &&
+       mouseY > buttonY && 
+       mouseY < buttonY + buttonHeight) {
+        resetGame();
+    }
 }
 </script>
-
 </body>
 </html>
