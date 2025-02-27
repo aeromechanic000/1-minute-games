@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo List Application</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        #todoInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            gap: 10px;
+        }
+
+        .todo-item.completed {
+            background-color: #f9f9f9;
+        }
+
+        .todo-item.completed .todo-text {
+            text-decoration: line-through;
+            color: #888;
+        }
+
+        .todo-text {
+            flex: 1;
+        }
+
+        .delete-btn {
+            background-color: #f44336;
+        }
+
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .filter-btn {
+            background-color: #2196F3;
+        }
+
+        .filter-btn.active {
+            background-color: #0b7dda;
+        }
+
+        .import-export {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .import-export button {
+            flex: 1;
+            background-color: #2196F3;
+        }
+
+        .import-export button:hover {
+            background-color: #0b7dda;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .message {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .message.success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+
+        .message.error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+
+        .clear-btn {
+            background-color: #f44336 !important;
+        }
+
+        .clear-btn:hover {
+            background-color: #da190b !important;
+        }
+
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .dialog-box {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .dialog-message {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Todo List</h1>
+        
+        <div class="input-section">
+            <input type="text" id="todoInput" placeholder="Add a new task...">
+            <button onclick="addTodo()">Add</button>
+        </div>
+
+        <div class="import-export">
+            <button onclick="exportToCSV()">Export to CSV</button>
+            <button onclick="document.getElementById('fileInput').click()">Import from CSV</button>
+            <button class="clear-btn" onclick="clearAllTasks()">Clear All Tasks</button>
+            <input type="file" id="fileInput" accept=".csv" onchange="importFromCSV(this)">
+        </div>
+
+        <div class="filters">
+            <button class="filter-btn active" onclick="filterTodos('all')">All</button>
+            <button class="filter-btn" onclick="filterTodos('active')">Active</button>
+            <button class="filter-btn" onclick="filterTodos('completed')">Completed</button>
+        </div>
+
+        <div id="messageArea"></div>
+        <div id="todoList"></div>
+    </div>
+
+    <script>
+        let todos = [];
+        let currentFilter = 'all';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTodos = localStorage.getItem('todos');
+            if (savedTodos) {
+                todos = JSON.parse(savedTodos);
+                renderTodos();
+            }
+        });
+
+        function addTodo() {
+            const input = document.getElementById('todoInput');
+            const text = input.value.trim();
+
+            if (text) {
+                const todo = {
+                    id: Date.now(),
+                    text: text,
+                    completed: false
+                };
+
+                todos.push(todo);
+                saveTodos();
+                renderTodos();
+                input.value = '';
+            }
+        }
+
+        function deleteTodo(id) {
+            todos = todos.filter(todo => todo.id !== id);
+            saveTodos();
+            renderTodos();
+        }
+
+        function toggleTodo(id) {
+            todos = todos.map(todo => {
+                if (todo.id === id) {
+                    return { ...todo, completed: !todo.completed };
+                }
+                return todo;
+            });
+            saveTodos();
+            renderTodos();
+        }
+
+        function filterTodos(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.toLowerCase() === filter) {
+                    btn.classList.add('active');
+                }
+            });
+            renderTodos();
+        }
+
+        function saveTodos() {
+            localStorage.setItem('todos', JSON.stringify(todos));
+        }
+
+        function renderTodos() {
+            const todoList = document.getElementById('todoList');
+            todoList.innerHTML = '';
+
+            let filteredTodos = todos;
+            if (currentFilter === 'active') {
+                filteredTodos = todos.filter(todo => !todo.completed);
+            } else if (currentFilter === 'completed') {
+                filteredTodos = todos.filter(todo => todo.completed);
+            }
+
+            filteredTodos.forEach(todo => {
+                const todoItem = document.createElement('div');
+                todoItem.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+                
+                todoItem.innerHTML = `
+                    <input type="checkbox" ${todo.completed ? 'checked' : ''} 
+                        onchange="toggleTodo(${todo.id})">
+                    <span class="todo-text">${todo.text}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">Delete</button>
+                `;
+
+                todoList.appendChild(todoItem);
+            });
+        }
+
+        function exportToCSV() {
+            const csvContent = [
+                ['ID', 'Task', 'Completed'].join(','),
+                ...todos.map(todo => [
+                    todo.id,
+                    `"${todo.text.replace(/"/g, '""')}"`,
+                    todo.completed
+                ].join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'todos.csv');
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showMessage('Tasks exported successfully!', 'success');
+        }
+
+        function importFromCSV(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const text = e.target.result;
+                        const rows = text.split('\n');
+                        
+                        const newTodos = rows.slice(1)
+                            .filter(row => row.trim())
+                            .map(row => {
+                                const [id, text, completed] = row.split(',');
+                                return {
+                                    id: parseInt(id),
+                                    text: text.replace(/^"|"$/g, '').replace(/""/g, '"'),
+                                    completed: completed.trim().toLowerCase() === 'true'
+                                };
+                            });
+
+                        if (newTodos.some(todo => !todo.text || isNaN(todo.id))) {
+                            throw new Error('Invalid CSV format');
+                        }
+
+                        todos = newTodos;
+                        saveTodos();
+                        renderTodos();
+                        showMessage('Tasks imported successfully!', 'success');
+                    } catch (error) {
+                        showMessage('Error importing CSV file. Please check the format.', 'error');
+                    }
+                };
+
+                reader.onerror = function() {
+                    showMessage('Error reading the file', 'error');
+                };
+
+                reader.readAsText(file);
+            }
+            input.value = '';
+        }
+
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 3000);
+        }
+
+        function showConfirmDialog(message, onConfirm) {
+            const overlay = document.createElement('div');
+            overlay.className = 'dialog-overlay';
+            
+            overlay.innerHTML = `
+                <div class="dialog-box">
+                    <div class="dialog-message">${message}</div>
+                    <div class="dialog-buttons">
+                        <button onclick="this.closest('.dialog-overlay').remove()">Cancel</button>
+                        <button class="delete-btn" onclick="
+                            this.closest('.dialog-overlay').remove();
+                            ${onConfirm.toString()}()
+                        ">Confirm</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+        }
+
+        function showConfirmDialog(message, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.className = 'dialog-overlay';
+    
+    overlay.innerHTML = `
+        <div class="dialog-box">
+            <div class="dialog-message">${message}</div>
+            <div class="dialog-buttons">
+                <button onclick="this.closest('.dialog-overlay').remove()">Cancel</button>
+                <button class="delete-btn" id="confirmButton">Confirm</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+
+    // Add event listener to confirm button
+    document.getElementById('confirmButton').addEventListener('click', () => {
+        overlay.remove();
+        onConfirm();
+    });
+}
+
+function clearAllTasks() {
+    if (todos.length === 0) {
+        showMessage('No tasks to clear!', 'error');
+        return;
+    }
+
+    showConfirmDialog('Are you sure you want to clear all tasks?', function() {
+        todos = [];
+        saveTodos();
+        renderTodos();
+        showMessage('All tasks cleared successfully!', 'success');
+    });
+}
+
+        document.getElementById('todoInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addTodo();
+            }
+        });
+    </script>
+</body>
+</html>
